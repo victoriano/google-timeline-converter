@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Timeline Converter - Simple Version</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.2s ease;
+        }
+        .upload-area.highlight {
+            border-color: #4285f4;
+            background-color: rgba(66, 133, 244, 0.05);
+        }
+        #fileInput {
+            display: none;
+        }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+        button:hover {
+            background-color: #3b77db;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        progress {
+            width: 100%;
+            height: 20px;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        #downloadBtn {
+            background-color: #0f9d58;
+            display: none;
+        }
+        #downloadBtn:hover {
+            background-color: #0b8043;
+        }
+        #formatSelector {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #fff8e1;
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Timeline Converter</h1>
+    <div class="container">
+        <p>
+            Convert your Google Location History JSON to CSV directly in your browser.
+            <strong>Your data never leaves your device - all processing happens locally.</strong>
+        </p>
+        
+        <div id="uploadArea" class="upload-area">
+            <p>Drag & drop your Location History JSON file here</p>
+            <p>or</p>
+            <button id="selectFileBtn">Select File</button>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+        
+        <div id="formatSelector">
+            <p><strong>Select your JSON format:</strong></p>
+            <label>
+                <input type="radio" name="format" value="array" checked> JSON Array Format (starts with [ )
+            </label><br>
+            <label>
+                <input type="radio" name="format" value="object"> JSON Object Format (starts with { )
+            </label>
+        </div>
+        
+        <div class="progress-container" id="progressContainer">
+            <p>Processing file...</p>
+            <progress id="progressBar" value="0" max="100"></progress>
+            <div id="status" class="status">Preparing...</div>
+        </div>
+        
+        <button id="downloadBtn">Download CSV</button>
+    </div>
+    
+    <footer>
+        <p>This tool works completely client-side. Your location data never leaves your browser.</p>
+    </footer>
+    
+    <script>
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        const uploadArea = document.getElementById('uploadArea');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const statusElement = document.getElementById('status');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // State
+        let processedData = [];
+        
+        /**
+         * Extract geo coordinates from a string like "geo:40.338423,-3.777495"
+         */
+        function extractGeoCoordinates(geoString) {
+            if (!geoString) return null;
+            
+            const geoMatch = geoString.match(/geo:([-\d.]+),([-\d.]+)/);
+            if (geoMatch) {
+                return {
+                    lat: parseFloat(geoMatch[1]),
+                    lng: parseFloat(geoMatch[2])
+                };
+            }
+            return null;
+        }
+        
+        /**
+         * Process a raw location entry into a structured format
+         */
+        function processLocationEntry(entry) {
+            try {
+                // Initialize an empty result object
+                const processed = {
+                    startTime: entry.startTime,
+                    endTime: entry.endTime
+                };
+                
+                // Extract visit data if it exists
+                if (entry.visit && entry.visit.topCandidate) {
+                    const topCandidate = entry.visit.topCandidate;
+                    
+                    // Add semantic type if it exists
+                    if (topCandidate.semanticType) {
+                        processed.semanticType = topCandidate.semanticType;
+                    }
+                    
+                    // Add probability if it exists
+                    if (topCandidate.probability) {
+                        processed.probability = parseFloat(topCandidate.probability);
+                    }
+                    
+                    // Add placeID if it exists
+                    if (topCandidate.placeID) {
+                        processed.placeID = topCandidate.placeID;
+                    }
+                    
+                    // Extract lat/long from placeLocation if it exists
+                    const geoData = extractGeoCoordinates(topCandidate.placeLocation);
+                    if (geoData) {
+                        processed.latitude = geoData.lat;
+                        processed.longitude = geoData.lng;
+                    }
+                }
+                
+                // Add activity data if it exists
+                if (entry.activity) {
+                    const activity = entry.activity;
+                    
+                    // Extract start geo coordinates
+                    const startGeo = extractGeoCoordinates(activity.start);
+                    if (startGeo) {
+                        processed.start_lat = startGeo.lat;
+                        processed.start_lng = startGeo.lng;
+                    }
+                    
+                    // Extract end geo coordinates
+                    const endGeo = extractGeoCoordinates(activity.end);
+                    if (endGeo) {
+                        processed.end_lat = endGeo.lat;
+                        processed.end_lng = endGeo.lng;
+                    }
+                    
+                    // Extract distance
+                    if (activity.distanceMeters) {
+                        processed.distance_meters = parseFloat(activity.distanceMeters);
+                    }
+                    
+                    // Extract topCandidate data
+                    if (activity.topCandidate) {
+                        if (activity.topCandidate.type) {
+                            processed.activity_type = activity.topCandidate.type;
+                        }
+                        if (activity.topCandidate.probability) {
+                            processed.activity_probability = parseFloat(activity.topCandidate.probability);
+                        }
+                    }
+                }
+                
+                // Add activity segment data if it exists
+                if (entry.activitySegment) {
+                    const segment = entry.activitySegment;
+                    
+                    if (segment.activities && segment.activities.length > 0) {
+                        // Get the first activity
+                        const firstActivity = segment.activities[0];
+                        if (firstActivity.activityType) {
+                            processed.activityType = firstActivity.activityType;
+                        }
+                        if (firstActivity.probability) {
+                            processed.activityConfidence = parseFloat(firstActivity.probability);
+                        }
+                    }
+                    
+                    // Add any other activitySegment fields that might be useful
+                    if (segment.distance) {
+                        processed.segment_distance = segment.distance;
+                    }
+                    if (segment.duration) {
+                        processed.segment_duration = segment.duration;
+                    }
+                    if (segment.activityType) {
+                        processed.segment_activityType = segment.activityType;
+                    }
+                    if (segment.confidence) {
+                        processed.segment_confidence = segment.confidence;
+                    }
+                }
+                
+                return processed;
+            } catch (error) {
+                console.error('Error processing entry:', error, entry);
+                // Return at least the timestamps if available
+                return {
+                    startTime: entry.startTime,
+                    endTime: entry.endTime,
+                    error: 'Failed to process this entry'
+                };
+            }
+        }
+        
+        /**
+         * Process a new format Google Location History JSON
+         */
+        function processNewFormat(data) {
+            const results = [];
+            
+            if (!data.locations || !Array.isArray(data.locations)) {
+                throw new Error("No locations array found in new format data");
+            }
+            
+            data.locations.forEach(loc => {
+                // Convert E7 format to decimal degrees
+                const latitude = loc.latitudeE7 ? loc.latitudeE7 / 10000000 : null;
+                const longitude = loc.longitudeE7 ? loc.longitudeE7 / 10000000 : null;
+                
+                // Use timestamp or timestampMs
+                const timestamp = loc.timestamp || loc.timestampMs;
+                
+                results.push({
+                    startTime: timestamp,
+                    endTime: timestamp,
+                    latitude: latitude,
+                    longitude: longitude,
+                    accuracy: loc.accuracy,
+                    altitude: loc.altitude,
+                    source: "Google Location History (new format)"
+                });
+            });
+            
+            return results;
+        }
+        
+        /**
+         * Process a JSON file
+         */
+        async function processLocationFile(file, onProgress) {
+            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
+            
+            return new Promise((resolve, reject) => {
+                const fileReader = new FileReader();
+                
+                fileReader.onload = () => {
+                    try {
+                        // Get the text content
+                        const jsonText = fileReader.result;
+                        const trimmedText = jsonText.toString().trim();
+                        
+                        onProgress({ message: "File loaded, starting JSON parsing..." });
+                        
+                        // Detect format and parse accordingly
+                        let data;
+                        
+                        try {
+                            // Parse the JSON
+                            data = JSON.parse(trimmedText);
+                            onProgress({ message: "JSON parsed successfully, processing entries..." });
+                            
+                            // Handle different formats based on structure
+                            if (selectedFormat === 'array' || Array.isArray(data)) {
+                                // Handle array format
+                                const entries = Array.isArray(data) ? data : [];
+                                const results = [];
+                                
+                                // Process each entry directly without streaming
+                                const totalEntries = entries.length;
+                                
+                                for (let i = 0; i < totalEntries; i++) {
+                                    const processed = processLocationEntry(entries[i]);
+                                    results.push(processed);
+                                    
+                                    // Update progress every 1000 entries or so
+                                    if (i % 1000 === 0 || i === totalEntries - 1) {
+                                        const percent = Math.round((i + 1) / totalEntries * 100);
+                                        onProgress({ message: `Processing: ${i + 1} of ${totalEntries} entries (${percent}%)` });
+                                        progressBar.value = percent;
+                                    }
+                                }
+                                
+                                resolve({
+                                    data: results,
+                                    message: `Successfully processed ${results.length} location entries from array format.`
+                                });
+                            } else if (data.locations && Array.isArray(data.locations)) {
+                                // New Google format with locations array
+                                onProgress({ message: "Detected new Google format. Processing..." });
+                                const results = processNewFormat(data);
+                                
+                                resolve({
+                                    data: results,
+                                    message: `Successfully processed ${results.length} location entries from new Google format.`
+                                });
+                            } else if (data.item && Array.isArray(data.item)) {
+                                // Standard format with "item" array
+                                const entries = data.item;
+                                const results = [];
+                                const totalEntries = entries.length;
+                                
+                                for (let i = 0; i < totalEntries; i++) {
+                                    const processed = processLocationEntry(entries[i]);
+                                    results.push(processed);
+                                    
+                                    if (i % 1000 === 0 || i === totalEntries - 1) {
+                                        const percent = Math.round((i + 1) / totalEntries * 100);
+                                        onProgress({ message: `Processing: ${i + 1} of ${totalEntries} entries (${percent}%)` });
+                                        progressBar.value = percent;
+                                    }
+                                }
+                                
+                                resolve({
+                                    data: results,
+                                    message: `Successfully processed ${results.length} location entries from object format.`
+                                });
+                            } else {
+                                reject({
+                                    error: "Unrecognized JSON structure",
+                                    details: "Could not find location data in expected format. Try changing the format option above.",
+                                    data: []
+                                });
+                            }
+                        } catch (parseError) {
+                            console.error("JSON parsing error:", parseError);
+                            reject({
+                                error: "Error parsing JSON file",
+                                details: `JSON syntax error: ${parseError.message}. Check if your file is properly formatted.`,
+                                data: []
+                            });
+                        }
+                    } catch (error) {
+                        console.error("General processing error:", error);
+                        reject({
+                            error: "Error processing file",
+                            details: error.message || "Unknown error occurred",
+                            data: []
+                        });
+                    }
+                };
+                
+                fileReader.onerror = () => {
+                    reject({
+                        error: "Error reading file",
+                        details: "The browser couldn't read the file. It might be too large or corrupted.",
+                        data: []
+                    });
+                };
+                
+                // Start reading the file
+                fileReader.readAsText(file);
+            });
+        }
+        
+        /**
+         * Generate a CSV file from location entries
+         */
+        function generateCSV(data) {
+            const options = {
+                header: true,
+                skipEmptyLines: true,
+            };
+            
+            return Papa.unparse(data, options);
+        }
+        
+        /**
+         * Download the generated CSV as a file
+         */
+        function downloadCSV(csvContent, filename = 'location-history.csv') {
+            // Create blob and URL
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a temporary link and trigger download
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // Clean up
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Event Handlers
+        function handleFileSelect(event) {
+            const files = fileInput.files;
+            if (files && files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('highlight');
+            
+            const files = event.dataTransfer?.files;
+            if (files && files.length > 0) {
+                processFile(files[0]);
+            }
+        }
+        
+        function handleDragOver(event) {
+            event.preventDefault();
+            uploadArea.classList.add('highlight');
+        }
+        
+        function handleDragLeave(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('highlight');
+        }
+        
+        async function processFile(file) {
+            // Only accept JSON files
+            if (!file.name.endsWith('.json')) {
+                alert('Please select a JSON file from Google Location History.');
+                return;
+            }
+            
+            // Update UI for processing
+            uploadArea.style.display = 'none';
+            document.getElementById('formatSelector').style.display = 'none';
+            progressContainer.style.display = 'block';
+            downloadBtn.style.display = 'none';
+            
+            // Show file info
+            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+            statusElement.textContent = `Reading file: ${file.name} (${fileSizeMB} MB)`;
+            progressBar.value = 0;
+            
+            try {
+                // Start processing
+                const result = await processLocationFile(file, updateProgress);
+                processedData = result.data;
+                
+                // Update UI after processing
+                const successMessage = result.message || `Processed ${result.data.length} location entries successfully!`;
+                statusElement.textContent = successMessage;
+                downloadBtn.style.display = 'inline-block';
+            } catch (error) {
+                console.error('Processing error:', error);
+                
+                // Show the error message
+                const errorTitle = error.error || 'Unknown error processing file';
+                const errorDetails = error.details || '';
+                
+                // Create a more user-friendly error display
+                statusElement.innerHTML = `
+                    <div style="color: #d32f2f; margin-bottom: 10px; font-weight: bold;">
+                        ${errorTitle}
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        ${errorDetails}
+                    </div>
+                    <div>
+                        <button id="resetBtn" style="background-color: #757575; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Try Again</button>
+                    </div>
+                `;
+                
+                // Add reset button functionality
+                const resetBtn = document.getElementById('resetBtn');
+                if (resetBtn) {
+                    resetBtn.addEventListener('click', () => {
+                        uploadArea.style.display = 'block';
+                        document.getElementById('formatSelector').style.display = 'block';
+                        progressContainer.style.display = 'none';
+                        downloadBtn.style.display = 'none';
+                    });
+                }
+                
+                // If we have partial data, still allow download
+                if (error.data && error.data.length > 0) {
+                    processedData = error.data;
+                    downloadBtn.style.display = 'inline-block';
+                    statusElement.innerHTML += `
+                        <div style="margin-top: 15px; color: #2e7d32;">
+                            Partial data with ${error.data.length} entries is available for download
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        function updateProgress(stats) {
+            if (stats.message) {
+                statusElement.textContent = stats.message;
+            }
+        }
+        
+        function handleDownload() {
+            if (processedData.length === 0) {
+                alert('No data available to download.');
+                return;
+            }
+            
+            statusElement.textContent = 'Generating CSV file...';
+            
+            try {
+                // Generate and download the CSV
+                const csvContent = generateCSV(processedData);
+                downloadCSV(csvContent);
+                
+                statusElement.textContent = 'CSV file downloaded successfully!';
+            } catch (error) {
+                console.error('CSV generation error:', error);
+                statusElement.innerHTML = `
+                    <div style="color: #d32f2f; margin-bottom: 10px;">
+                        Error generating CSV: ${error.message || 'Unknown error'}
+                    </div>
+                    <div>
+                        Please try again or try with a smaller file.
+                    </div>
+                `;
+            }
+        }
+        
+        // Initialize Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // File selection button
+            selectFileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Drag and drop
+            uploadArea.addEventListener('dragover', handleDragOver);
+            uploadArea.addEventListener('dragleave', handleDragLeave);
+            uploadArea.addEventListener('drop', handleDrop);
+            
+            // Download button
+            downloadBtn.addEventListener('click', handleDownload);
+        });
+    </script>
+</body>
+</html> 
