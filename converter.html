@@ -126,6 +126,7 @@
         </div>
         
         <button id="downloadBtn">Download CSV</button>
+        <button id="downloadActivityBtn" style="background-color: #FF5722; margin-left: 10px; display: none;">Download Activity CSV</button>
     </div>
     
     <footer>
@@ -141,6 +142,7 @@
         const progressBar = document.getElementById('progressBar');
         const statusElement = document.getElementById('status');
         const downloadBtn = document.getElementById('downloadBtn');
+        const downloadActivityBtn = document.getElementById('downloadActivityBtn');
         
         // State
         let processedData = [];
@@ -459,6 +461,58 @@
             URL.revokeObjectURL(url);
         }
         
+        /**
+         * Extract only activity data entries and format for CSV
+         */
+        function extractActivityData(data) {
+            // Filter entries that have activity data
+            const activityEntries = data.filter(entry => entry.activity_type || entry.start_lat || entry.end_lat || entry.distance_meters);
+            
+            // Map to a cleaner format focused on activity data
+            return activityEntries.map(entry => {
+                // Calculate distance in kilometers
+                const distanceKm = entry.distance_meters ? (entry.distance_meters / 1000) : null;
+                
+                // Calculate time variables
+                let speedKph = null;
+                let durationMinutes = null;
+                
+                if (entry.startTime && entry.endTime) {
+                    try {
+                        // Parse timestamps
+                        const startDate = new Date(entry.startTime);
+                        const endDate = new Date(entry.endTime);
+                        
+                        // Calculate duration in minutes and hours
+                        durationMinutes = (endDate - startDate) / (1000 * 60);
+                        const durationHours = durationMinutes / 60;
+                        
+                        // Calculate speed if duration and distance are valid
+                        if (durationHours > 0 && distanceKm) {
+                            speedKph = distanceKm / durationHours;
+                        }
+                    } catch (e) {
+                        console.error('Error calculating time metrics:', e);
+                    }
+                }
+                
+                return {
+                    startTime: entry.startTime,
+                    endTime: entry.endTime,
+                    duration_minutes: durationMinutes !== null ? durationMinutes.toFixed(1) : null,
+                    activity_type: entry.activity_type || 'unknown',
+                    activity_probability: entry.activity_probability || 0,
+                    start_lat: entry.start_lat || null,
+                    start_lng: entry.start_lng || null,
+                    end_lat: entry.end_lat || null,
+                    end_lng: entry.end_lng || null,
+                    distance_meters: entry.distance_meters || null,
+                    distance_km: distanceKm !== null ? distanceKm.toFixed(3) : null,
+                    speed_kph: speedKph !== null ? speedKph.toFixed(2) : null
+                };
+            });
+        }
+        
         // Event Handlers
         function handleFileSelect(event) {
             const files = fileInput.files;
@@ -499,6 +553,7 @@
             document.getElementById('formatSelector').style.display = 'none';
             progressContainer.style.display = 'block';
             downloadBtn.style.display = 'none';
+            downloadActivityBtn.style.display = 'none';
             
             // Show file info
             const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
@@ -514,6 +569,9 @@
                 const successMessage = result.message || `Processed ${result.data.length} location entries successfully!`;
                 statusElement.textContent = successMessage;
                 downloadBtn.style.display = 'inline-block';
+                // Show activity button if we have activity data
+                const hasActivityData = result.data.some(entry => entry.activity_type || entry.start_lat || entry.end_lat || entry.distance_meters);
+                downloadActivityBtn.style.display = hasActivityData ? 'inline-block' : 'none';
             } catch (error) {
                 console.error('Processing error:', error);
                 
@@ -542,6 +600,7 @@
                         document.getElementById('formatSelector').style.display = 'block';
                         progressContainer.style.display = 'none';
                         downloadBtn.style.display = 'none';
+                        downloadActivityBtn.style.display = 'none';
                     });
                 }
                 
@@ -549,6 +608,7 @@
                 if (error.data && error.data.length > 0) {
                     processedData = error.data;
                     downloadBtn.style.display = 'inline-block';
+                    downloadActivityBtn.style.display = 'inline-block';
                     statusElement.innerHTML += `
                         <div style="margin-top: 15px; color: #2e7d32;">
                             Partial data with ${error.data.length} entries is available for download
@@ -591,6 +651,45 @@
             }
         }
         
+        function handleActivityDownload() {
+            if (processedData.length === 0) {
+                alert('No data available to download.');
+                return;
+            }
+            
+            statusElement.textContent = 'Generating Activity CSV file...';
+            
+            try {
+                // Extract and format activity data
+                const activityData = extractActivityData(processedData);
+                
+                if (activityData.length === 0) {
+                    statusElement.innerHTML = `
+                        <div style="color: #d32f2f; margin-bottom: 10px;">
+                            No activity data found in the processed entries.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Generate and download the CSV
+                const csvContent = generateCSV(activityData);
+                downloadCSV(csvContent, 'location-activity-data.csv');
+                
+                statusElement.textContent = `Activity CSV file with ${activityData.length} entries downloaded successfully!`;
+            } catch (error) {
+                console.error('Activity CSV generation error:', error);
+                statusElement.innerHTML = `
+                    <div style="color: #d32f2f; margin-bottom: 10px;">
+                        Error generating Activity CSV: ${error.message || 'Unknown error'}
+                    </div>
+                    <div>
+                        Please try again.
+                    </div>
+                `;
+            }
+        }
+        
         // Initialize Event Listeners
         document.addEventListener('DOMContentLoaded', () => {
             // File selection button
@@ -604,6 +703,7 @@
             
             // Download button
             downloadBtn.addEventListener('click', handleDownload);
+            downloadActivityBtn.addEventListener('click', handleActivityDownload);
         });
     </script>
 </body>
