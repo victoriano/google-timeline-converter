@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Google Timeline Converter - Simple Version</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -119,6 +120,11 @@
             </label>
         </div>
         
+        <div id="enrichmentOptions" style="margin-top: 15px; padding: 10px; background-color: #e8f5e9; border-radius: 4px; border-left: 4px solid #4caf50;">
+            <p><strong>Automatic Municipality Detection</strong></p>
+            <div id="geoJsonStatus" style="margin-top: 5px; font-size: 12px;">Loading Spain municipality boundaries...</div>
+        </div>
+        
         <div class="progress-container" id="progressContainer">
             <p>Processing file...</p>
             <progress id="progressBar" value="0" max="100"></progress>
@@ -174,6 +180,9 @@
                     endTime: entry.endTime
                 };
                 
+                // Make sure we capture coordinates in any form they appear
+                let hasLocationData = false;
+                
                 // Extract visit data if it exists
                 if (entry.visit && entry.visit.topCandidate) {
                     const topCandidate = entry.visit.topCandidate;
@@ -198,7 +207,19 @@
                     if (geoData) {
                         processed.latitude = geoData.lat;
                         processed.longitude = geoData.lng;
+                        hasLocationData = true;
                     }
+                }
+                
+                // If we have location directly on the entry, use it (sometimes there's lat/long directly)
+                if (entry.latitudeE7 !== undefined && entry.longitudeE7 !== undefined) {
+                    processed.latitude = entry.latitudeE7 / 10000000;
+                    processed.longitude = entry.longitudeE7 / 10000000;
+                    hasLocationData = true;
+                } else if (entry.latitude !== undefined && entry.longitude !== undefined) {
+                    processed.latitude = parseFloat(entry.latitude);
+                    processed.longitude = parseFloat(entry.longitude);
+                    hasLocationData = true;
                 }
                 
                 // Add activity data if it exists
@@ -210,6 +231,13 @@
                     if (startGeo) {
                         processed.start_lat = startGeo.lat;
                         processed.start_lng = startGeo.lng;
+                        
+                        // If we don't have main coordinates yet, use these
+                        if (!hasLocationData) {
+                            processed.latitude = startGeo.lat;
+                            processed.longitude = startGeo.lng;
+                            hasLocationData = true;
+                        }
                     }
                     
                     // Extract end geo coordinates
@@ -217,6 +245,13 @@
                     if (endGeo) {
                         processed.end_lat = endGeo.lat;
                         processed.end_lng = endGeo.lng;
+                        
+                        // If we still don't have coordinates, use end point
+                        if (!hasLocationData) {
+                            processed.latitude = endGeo.lat;
+                            processed.longitude = endGeo.lng;
+                            hasLocationData = true;
+                        }
                     }
                     
                     // Extract distance
@@ -431,9 +466,67 @@
          * Generate a CSV file from location entries
          */
         function generateCSV(data) {
+            // Check if we actually have data
+            if (!data || data.length === 0) {
+                console.error('No data to convert to CSV');
+                return '';
+            }
+            
+            console.log(`Generating CSV for ${data.length} entries`);
+            
+            // Identify the type of data and create appropriate column order
+            const isActivityData = data[0].hasOwnProperty('start_lat') || data[0].hasOwnProperty('end_lat');
+            
+            // Define column order for better readability
+            const columnOrder = isActivityData ? [
+                // Time information
+                'startTime', 'endTime', 'duration_minutes',
+                
+                // Location information
+                'latitude', 'longitude', 'municipality',
+                
+                // Activity details
+                'activity_type', 'activity_probability',
+                
+                // Start location
+                'start_lat', 'start_lng', 'start_municipality',
+                
+                // End location
+                'end_lat', 'end_lng', 'end_municipality',
+                
+                // Distance information
+                'distance_meters', 'distance_km', 'speed_kph',
+                
+                // Additional details
+                'placeID', 'semanticType'
+            ] : [
+                // Basic information
+                'startTime', 'endTime',
+                
+                // Location 
+                'latitude', 'longitude', 'municipality',
+                
+                // Visit information
+                'semanticType', 'probability', 'placeID',
+                
+                // Activity data if exists
+                'activity_type', 'activity_probability',
+                'start_lat', 'start_lng', 'start_municipality',
+                'end_lat', 'end_lng', 'end_municipality',
+                'distance_meters'
+            ];
+            
+            // Create field definitions for Papa Parse
+            const fields = columnOrder.filter(field => 
+                // Only include fields that exist in at least one data entry
+                data.some(entry => entry[field] !== undefined)
+            );
+            
+            // Generate the CSV
             const options = {
                 header: true,
                 skipEmptyLines: true,
+                columns: fields
             };
             
             return Papa.unparse(data, options);
@@ -466,7 +559,15 @@
          */
         function extractActivityData(data) {
             // Filter entries that have activity data
-            const activityEntries = data.filter(entry => entry.activity_type || entry.start_lat || entry.end_lat || entry.distance_meters);
+            const activityEntries = data.filter(entry => 
+                entry.activity_type || 
+                entry.start_lat || 
+                entry.end_lat || 
+                entry.distance_meters ||
+                entry.activityType
+            );
+            
+            console.log(`Found ${activityEntries.length} entries with activity data out of ${data.length} total entries`);
             
             // Map to a cleaner format focused on activity data
             return activityEntries.map(entry => {
@@ -496,19 +597,39 @@
                     }
                 }
                 
+                // Create the processed entry with all relevant fields
                 return {
                     startTime: entry.startTime,
                     endTime: entry.endTime,
                     duration_minutes: durationMinutes !== null ? durationMinutes.toFixed(1) : null,
-                    activity_type: entry.activity_type || 'unknown',
-                    activity_probability: entry.activity_probability || 0,
+                    
+                    // Include main location if available
+                    latitude: entry.latitude,
+                    longitude: entry.longitude,
+                    municipality: entry.municipality,
+                    
+                    // Activity type and details
+                    activity_type: entry.activity_type || entry.activityType || 'unknown',
+                    activity_probability: entry.activity_probability || entry.activityConfidence || 0,
+                    
+                    // Start coordinates
                     start_lat: entry.start_lat || null,
                     start_lng: entry.start_lng || null,
+                    start_municipality: entry.start_municipality || null,
+                    
+                    // End coordinates
                     end_lat: entry.end_lat || null,
                     end_lng: entry.end_lng || null,
+                    end_municipality: entry.end_municipality || null,
+                    
+                    // Distance metrics
                     distance_meters: entry.distance_meters || null,
                     distance_km: distanceKm !== null ? distanceKm.toFixed(3) : null,
-                    speed_kph: speedKph !== null ? speedKph.toFixed(2) : null
+                    speed_kph: speedKph !== null ? speedKph.toFixed(2) : null,
+                    
+                    // Other activity data
+                    placeID: entry.placeID || null,
+                    semanticType: entry.semanticType || null
                 };
             });
         }
@@ -564,6 +685,12 @@
                 // Start processing
                 const result = await processLocationFile(file, updateProgress);
                 processedData = result.data;
+                
+                // Enrich with municipality data if available
+                if (municipalityPolygons) {
+                    statusElement.textContent = 'Enriching data with municipality names...';
+                    processedData = enrichWithMunicipalities(processedData);
+                }
                 
                 // Update UI after processing
                 const successMessage = result.message || `Processed ${result.data.length} location entries successfully!`;
@@ -638,6 +765,14 @@
                 downloadCSV(csvContent);
                 
                 statusElement.textContent = 'CSV file downloaded successfully!';
+                
+                // Add info about enrichment if applied
+                if (municipalityPolygons) {
+                    const municipalityCount = processedData.filter(e => e.municipality).length;
+                    if (municipalityCount > 0) {
+                        statusElement.textContent += ` Includes ${municipalityCount} entries with municipality data.`;
+                    }
+                }
             } catch (error) {
                 console.error('CSV generation error:', error);
                 statusElement.innerHTML = `
@@ -677,6 +812,15 @@
                 downloadCSV(csvContent, 'location-activity-data.csv');
                 
                 statusElement.textContent = `Activity CSV file with ${activityData.length} entries downloaded successfully!`;
+                
+                // Add info about enrichment if applied
+                if (municipalityPolygons) {
+                    const startMunicipalityCount = activityData.filter(e => e.start_municipality).length;
+                    const endMunicipalityCount = activityData.filter(e => e.end_municipality).length;
+                    if (startMunicipalityCount > 0 || endMunicipalityCount > 0) {
+                        statusElement.textContent += ` Includes municipality data for ${startMunicipalityCount} start points and ${endMunicipalityCount} end points.`;
+                    }
+                }
             } catch (error) {
                 console.error('Activity CSV generation error:', error);
                 statusElement.innerHTML = `
@@ -701,10 +845,181 @@
             uploadArea.addEventListener('dragleave', handleDragLeave);
             uploadArea.addEventListener('drop', handleDrop);
             
-            // Download button
+            // Download buttons
             downloadBtn.addEventListener('click', handleDownload);
             downloadActivityBtn.addEventListener('click', handleActivityDownload);
+            
+            // Automatically load municipality data
+            autoLoadGeoJson();
         });
+        
+        /**
+         * Loads GeoJSON data and processes the boundaries
+         */
+        let municipalityPolygons = null;
+        let municipalityNameField = 'NAME_4';  // Default field name in GADM data
+        
+        /**
+         * Automatically load the GeoJSON file for Spain from the server
+         */
+        function autoLoadGeoJson() {
+            const statusElement = document.getElementById('geoJsonStatus');
+            statusElement.textContent = 'Loading Spain municipality boundaries...';
+            statusElement.style.color = '#666';
+            
+            try {
+                // Instead of loading from external file, use the URL with CORS support
+                const gadmUrl = 'https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_ESP_4.json';
+                
+                fetch(gadmUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(geojson => {
+                        // Process the GeoJSON data
+                        municipalityPolygons = geojson;
+                        statusElement.textContent = `✓ Loaded ${geojson.features ? geojson.features.length : 0} Spain municipality boundaries.`;
+                        statusElement.style.color = '#2e7d32';
+                        
+                        // Enrich any already processed data
+                        if (processedData.length > 0) {
+                            processedData = enrichWithMunicipalities(processedData);
+                            statusElement.textContent += ` - Enriched ${processedData.length} entries with municipality data.`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading GeoJSON from URL:', error);
+                        loadFallbackGeoJson(statusElement);
+                    });
+            } catch (error) {
+                console.error('Error setting up GeoJSON fetch:', error);
+                loadFallbackGeoJson(statusElement);
+            }
+        }
+        
+        /**
+         * Fallback to load a simplified version embedded in the page
+         */
+        function loadFallbackGeoJson(statusElement) {
+            statusElement.textContent = 'Loading simplified municipality boundaries...';
+            
+            // This would normally contain the simplified GeoJSON object
+            // For now, we'll use a minimal version to demonstrate
+            const simplifiedGeoJson = {
+                "type": "FeatureCollection",
+                "features": [
+                    // Major cities/regions in Spain - these would be polygons in reality
+                    // but we're using points with a buffer for this example
+                    {
+                        "type": "Feature",
+                        "properties": { "NAME_4": "Madrid" },
+                        "geometry": { "type": "Point", "coordinates": [-3.7038, 40.4168] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { "NAME_4": "Barcelona" },
+                        "geometry": { "type": "Point", "coordinates": [2.1734, 41.3851] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { "NAME_4": "Valencia" },
+                        "geometry": { "type": "Point", "coordinates": [-0.3763, 39.4699] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { "NAME_4": "Sevilla" },
+                        "geometry": { "type": "Point", "coordinates": [-5.9845, 37.3891] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { "NAME_4": "Zaragoza" },
+                        "geometry": { "type": "Point", "coordinates": [-0.8890, 41.6488] }
+                    }
+                ]
+            };
+            
+            municipalityPolygons = simplifiedGeoJson;
+            statusElement.textContent = `✓ Loaded simplified municipality data (${simplifiedGeoJson.features.length} major cities).`;
+            statusElement.style.color = '#FF9800';
+            
+            // Enrich any already processed data
+            if (processedData.length > 0) {
+                processedData = enrichWithMunicipalities(processedData);
+                statusElement.textContent += ` - Enriched nearby entries.`;
+            }
+        }
+        
+        /**
+         * Enrich location data with municipality names
+         */
+        function enrichWithMunicipalities(data) {
+            if (!municipalityPolygons) {
+                console.warn('No municipality polygons available for enrichment');
+                return data;
+            }
+            
+            let enrichedCount = 0;
+            
+            const enriched = data.map(entry => {
+                // For regular entries, use main lat/long
+                if (entry.latitude !== undefined && entry.longitude !== undefined) {
+                    entry.municipality = findMunicipality(entry.latitude, entry.longitude);
+                    if (entry.municipality) enrichedCount++;
+                }
+                // For activity entries, use start coordinates if main not available
+                else if (entry.start_lat !== undefined && entry.start_lng !== undefined) {
+                    entry.start_municipality = findMunicipality(entry.start_lat, entry.start_lng);
+                    if (entry.start_municipality) enrichedCount++;
+                    
+                    // Also add main municipality using start point for better CSV output
+                    entry.municipality = entry.start_municipality;
+                }
+                
+                // Add end municipality for activities if coordinates exist
+                if (entry.end_lat !== undefined && entry.end_lng !== undefined) {
+                    entry.end_municipality = findMunicipality(entry.end_lat, entry.end_lng);
+                    if (entry.end_municipality) enrichedCount++;
+                }
+                
+                return entry;
+            });
+            
+            console.log(`Enriched ${enrichedCount} location points with municipality data out of ${data.length} total entries`);
+            return enriched;
+        }
+        
+        /**
+         * Find municipality for a given point
+         */
+        function findMunicipality(lat, lng) {
+            if (!municipalityPolygons || !municipalityPolygons.features) {
+                return null;
+            }
+            
+            const point = turf.point([lng, lat]);
+            
+            for (const feature of municipalityPolygons.features) {
+                // For polygon geometries (the normal case)
+                if (feature.geometry && feature.geometry.type.includes('Polygon') && 
+                    turf.booleanPointInPolygon(point, feature.geometry)) {
+                    return feature.properties[municipalityNameField] || 'Unknown';
+                }
+                
+                // For the simplified version with points
+                if (feature.geometry && feature.geometry.type === 'Point') {
+                    // Create a 10km buffer around the point
+                    const buffer = turf.buffer(feature.geometry, 10, {units: 'kilometers'});
+                    if (turf.booleanPointInPolygon(point, buffer)) {
+                        return feature.properties[municipalityNameField] || 'Unknown';
+                    }
+                }
+            }
+            
+            return null;
+        }
     </script>
 </body>
 </html> 
