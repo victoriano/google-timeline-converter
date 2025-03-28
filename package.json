@@ -4,7 +4,7 @@
   "description": "A client-side tool to convert Google Location History JSON to CSV",
   "main": "dist/bundle.js",
   "scripts": {
-    "build": "webpack --mode production && cp converter.html dist/index.html",
+    "build": "webpack --mode production && cp converter.html dist/index.html && cp geo-enrichment.js dist/",
     "dev": "webpack --mode development --watch",
     "serve": "http-server -o"
   },
@@ -19,6 +19,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "copy-webpack-plugin": "^11.0.0",
     "ts-loader": "^9.4.4",
     "typescript": "^5.1.6",
     "webpack": "^5.88.2",

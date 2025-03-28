@@ -3,155 +3,843 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Google Timeline Converter - Simple Version</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <title>Google Location History Converter</title>
+    <!-- Include Turf.js for spatial operations -->
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <!-- Include the geo-enrichment module -->
+    <script src="geo-enrichment.js" defer></script>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1, h2, h3 {
+            color: #1a73e8;
         }
         h1 {
-            color: #333;
-            text-align: center;
+            border-bottom: 2px solid #f1f1f1;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
         }
         .container {
-            border-radius: 5px;
-            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             padding: 20px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        .upload-area {
-            border: 2px dashed #ccc;
-            border-radius: 5px;
-            padding: 25px;
-            text-align: center;
             margin-bottom: 20px;
-            transition: all 0.2s ease;
         }
-        .upload-area.highlight {
-            border-color: #4285f4;
-            background-color: rgba(66, 133, 244, 0.05);
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #1a73e8;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
         }
-        #fileInput {
-            display: none;
+        .warning {
+            background-color: #fff3e0;
+            border-left: 4px solid #ff9800;
+        }
+        .success {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
         }
         button {
-            background-color: #4285f4;
+            background-color: #1a73e8;
             color: white;
             border: none;
             padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
             border-radius: 4px;
-            transition: background-color 0.2s ease;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
         }
         button:hover {
-            background-color: #3b77db;
+            background-color: #1557b0;
         }
         button:disabled {
             background-color: #cccccc;
             cursor: not-allowed;
         }
-        .progress-container {
-            margin-top: 20px;
+        #fileInput {
             display: none;
         }
-        progress {
-            width: 100%;
-            height: 20px;
-        }
-        .status {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-        #downloadBtn {
-            background-color: #0f9d58;
-            display: none;
-        }
-        #downloadBtn:hover {
-            background-color: #0b8043;
-        }
-        #formatSelector {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #fff8e1;
+        .file-input-label {
+            display: inline-block;
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 20px;
             border-radius: 4px;
-            border-left: 4px solid #ffc107;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
         }
-        footer {
-            margin-top: 40px;
+        .file-input-label:hover {
+            background-color: #1557b0;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
             text-align: center;
-            font-size: 14px;
-            color: #666;
+            line-height: 20px;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f1f1f1;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        #preview {
+            margin-top: 20px;
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .toggle-section {
+            cursor: pointer;
+        }
+        .toggle-section::after {
+            content: " ▼";
+            font-size: 0.8em;
+        }
+        .toggle-section.collapsed::after {
+            content: " ►";
+        }
+        .collapsible {
+            display: block;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .collapsible.collapsed {
+            max-height: 0;
+            display: none;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-right: 5px;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-color: #ddd;
+            border-bottom: 2px solid #1a73e8;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <h1>Google Timeline Converter</h1>
-    <div class="container">
-        <p>
-            Convert your Google Location History JSON to CSV directly in your browser.
-            <strong>Your data never leaves your device - all processing happens locally.</strong>
-        </p>
-        
-        <div id="uploadArea" class="upload-area">
-            <p>Drag & drop your Location History JSON file here</p>
-            <p>or</p>
-            <button id="selectFileBtn">Select File</button>
-            <input type="file" id="fileInput" accept=".json">
-        </div>
-        
-        <div id="formatSelector">
-            <p><strong>Select your JSON format:</strong></p>
-            <label>
-                <input type="radio" name="format" value="array" checked> JSON Array Format (starts with [ )
-            </label><br>
-            <label>
-                <input type="radio" name="format" value="object"> JSON Object Format (starts with { )
-            </label>
-        </div>
-        
-        <div id="enrichmentOptions" style="margin-top: 15px; padding: 10px; background-color: #e8f5e9; border-radius: 4px; border-left: 4px solid #4caf50;">
-            <p><strong>Automatic Municipality Detection</strong></p>
-            <div id="geoJsonStatus" style="margin-top: 5px; font-size: 12px;">Loading Spain municipality boundaries...</div>
-        </div>
-        
-        <div class="progress-container" id="progressContainer">
-            <p>Processing file...</p>
-            <progress id="progressBar" value="0" max="100"></progress>
-            <div id="status" class="status">Preparing...</div>
-        </div>
-        
-        <button id="downloadBtn">Download CSV</button>
-        <button id="downloadActivityBtn" style="background-color: #FF5722; margin-left: 10px; display: none;">Download Activity CSV</button>
+    <h1>Google Location History Converter</h1>
+    <div class="info-box">
+        <p>This tool converts your Google Location History JSON files to CSV format. <strong>All processing happens in your browser</strong> - your data never leaves your computer. You can use this for:</p>
+        <ul>
+            <li>Converting standard/raw Google Takeout location history files</li>
+            <li>Processing activity segment data (walking, cycling, driving, etc.)</li>
+            <li>Exporting in formats suitable for QGIS, Google Earth, or spreadsheet analysis</li>
+        </ul>
     </div>
     
-    <footer>
-        <p>This tool works completely client-side. Your location data never leaves your browser.</p>
-    </footer>
-    
+    <div class="container">
+        <div class="card">
+            <h2>Step 1: Select Your Location History JSON File</h2>
+            <p>Select the JSON file from your Google Takeout download (typically named <code>Location History.json</code> or <code>Records.json</code>).</p>
+            <div>
+                <label for="fileInput" class="file-input-label">Choose File</label>
+                <input type="file" id="fileInput" accept=".json">
+                <span id="fileName"></span>
+            </div>
+            <div id="status"></div>
+            <div class="progress-container" style="display: none;">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Step 2: Configure and Process</h2>
+            <div class="info-box">
+                <p>Options for processing your data:</p>
+                <ul>
+                    <li><strong>Complete Location Data:</strong> Export all locations with timestamps, coordinates, and accuracy</li>
+                    <li><strong>Activity Data:</strong> Export movement activities (walking, driving, etc.) with distances and durations</li>
+                </ul>
+            </div>
+            
+            <div class="action-buttons">
+                <button id="processButton" disabled>Process File</button>
+                <button id="downloadAllButton" disabled>Download Location History CSV</button>
+                <button id="downloadActivitiesButton" disabled>Download Activities CSV</button>
+            </div>
+            
+            <div id="geoDetectionInfo" class="info-box warning" style="margin-top: 15px; display: none;">
+                <h3 style="margin-top: 0;">Automatic Municipality Detection</h3>
+                <div id="municipalityStatus"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="toggle-section" id="resultsToggle">Results Preview</h2>
+            <div class="collapsible" id="resultsSection">
+                <div class="tabs">
+                    <div class="tab active" data-tab="allLocations">Location History</div>
+                    <div class="tab" data-tab="activities">Activity Data</div>
+                </div>
+                
+                <div class="tab-content active" id="allLocations">
+                    <div id="previewAll">Select and process a file to see a preview</div>
+                </div>
+                
+                <div class="tab-content" id="activities">
+                    <div id="previewActivities">Select and process a file to see a preview</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="toggle-section collapsed" id="instructionsToggle">How to Use the Data</h2>
+            <div class="collapsible collapsed" id="instructionsSection">
+                <h3>Viewing Your Data in QGIS</h3>
+                <ol>
+                    <li>Download your CSV file using the "Download" button above</li>
+                    <li>Open QGIS and create a new project</li>
+                    <li>Go to <strong>Layer > Add Layer > Add Delimited Text Layer</strong></li>
+                    <li>Browse to your downloaded CSV file</li>
+                    <li>Make sure the following settings are applied:
+                        <ul>
+                            <li>File format: CSV</li>
+                            <li>Record and Field options: select "First record has field names"</li>
+                            <li>Geometry definition: select "Point coordinates"</li>
+                            <li>X field: select "longitude"</li>
+                            <li>Y field: select "latitude"</li>
+                        </ul>
+                    </li>
+                    <li>Click "Add" to load your data as points on the map</li>
+                    <li>Right-click the layer and choose "Properties" to style your points</li>
+                </ol>
+                
+                <h3>Understanding the Output</h3>
+                <p>The Location History CSV file contains the following columns:</p>
+                <table>
+                    <tr>
+                        <th>Column</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>timestamp</td>
+                        <td>Date and time in ISO format (YYYY-MM-DD HH:MM:SS)</td>
+                    </tr>
+                    <tr>
+                        <td>latitude</td>
+                        <td>Latitude coordinate</td>
+                    </tr>
+                    <tr>
+                        <td>longitude</td>
+                        <td>Longitude coordinate</td>
+                    </tr>
+                    <tr>
+                        <td>country</td>
+                        <td>Country name (if detected)</td>
+                    </tr>
+                    <tr>
+                        <td>region</td>
+                        <td>Administrative region (if detected)</td>
+                    </tr>
+                    <tr>
+                        <td>province</td>
+                        <td>Province or state (if detected)</td>
+                    </tr>
+                    <tr>
+                        <td>municipality</td>
+                        <td>Municipality or city (if detected)</td>
+                    </tr>
+                    <tr>
+                        <td>placeID</td>
+                        <td>Google's place ID (if available)</td>
+                    </tr>
+                    <tr>
+                        <td>semanticType</td>
+                        <td>Location semantic type (e.g., Home, Work)</td>
+                    </tr>
+                    <tr>
+                        <td>probability</td>
+                        <td>Probability of the place candidate (topCandidate.probability)</td>
+                    </tr>
+                    <tr>
+                        <td>visitProbability</td>
+                        <td>Overall probability of the visit (visit.probability)</td>
+                    </tr>
+                </table>
+                
+                <h3>Activity Data Fields</h3>
+                <p>The Activities CSV includes additional fields:</p>
+                <table>
+                    <tr>
+                        <th>Column</th>
+                        <th>Description</th>
+                    </tr>
+                    <tr>
+                        <td>startTime</td>
+                        <td>When the activity started</td>
+                    </tr>
+                    <tr>
+                        <td>endTime</td>
+                        <td>When the activity ended</td>
+                    </tr>
+                    <tr>
+                        <td>duration_minutes</td>
+                        <td>Duration of the activity in minutes</td>
+                    </tr>
+                    <tr>
+                        <td>distance_km</td>
+                        <td>Approximate distance traveled in kilometers</td>
+                    </tr>
+                    <tr>
+                        <td>speed_kph</td>
+                        <td>Average speed in kilometers per hour</td>
+                    </tr>
+                    <tr>
+                        <td>latitude, longitude</td>
+                        <td>Starting coordinates of the activity</td>
+                    </tr>
+                    <tr>
+                        <td>start_lat, start_lng</td>
+                        <td>Starting coordinates of the activity</td>
+                    </tr>
+                    <tr>
+                        <td>end_lat, end_lng</td>
+                        <td>Ending coordinates of the activity</td>
+                    </tr>
+                    <tr>
+                        <td>activity_type</td>
+                        <td>Detected activity (WALKING, CYCLING, IN_VEHICLE)</td>
+                    </tr>
+                    <tr>
+                        <td>activity_probability</td>
+                        <td>Confidence level of the activity detection</td>
+                    </tr>
+                    <tr>
+                        <td>municipality</td>
+                        <td>Municipality where the activity started</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // DOM Elements
-        const fileInput = document.getElementById('fileInput');
-        const selectFileBtn = document.getElementById('selectFileBtn');
-        const uploadArea = document.getElementById('uploadArea');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const statusElement = document.getElementById('status');
-        const downloadBtn = document.getElementById('downloadBtn');
-        const downloadActivityBtn = document.getElementById('downloadActivityBtn');
-        
-        // State
+        // Global variables
         let processedData = [];
+        let activityData = [];
+        let fileReader = new FileReader();
+        
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const status = document.getElementById('status');
+        const progressBar = document.getElementById('progressBar');
+        const processButton = document.getElementById('processButton');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+        const downloadActivitiesButton = document.getElementById('downloadActivitiesButton');
+        const previewAll = document.getElementById('previewAll');
+        const previewActivities = document.getElementById('previewActivities');
+        const geoDetectionInfo = document.getElementById('geoDetectionInfo');
+        const municipalityStatus = document.getElementById('municipalityStatus');
+
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // File selection
+            fileInput.addEventListener('change', handleFileSelect);
+            
+            // Button actions
+            processButton.addEventListener('click', processFile);
+            downloadAllButton.addEventListener('click', () => downloadCSV(processedData, 'location-history.csv'));
+            downloadActivitiesButton.addEventListener('click', () => downloadCSV(activityData, 'location-activity-data.csv'));
+            
+            // Toggle sections
+            document.getElementById('resultsToggle').addEventListener('click', function() {
+                toggleSection('resultsSection', 'resultsToggle');
+            });
+            
+            document.getElementById('instructionsToggle').addEventListener('click', function() {
+                toggleSection('instructionsSection', 'instructionsToggle');
+            });
+            
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // Update tab active state
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update content visibility
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Initialize geo-enrichment functionality
+            geoDetectionInfo.style.display = 'block';
+            
+            // Using the extracted geo-enrichment module
+            // Safely check if the geo-enrichment module is loaded
+            if (window.geoEnrichment && window.geoEnrichment.initGeoEnrichment) {
+                window.geoEnrichment.initGeoEnrichment(municipalityStatus);
+            } else {
+                // Fallback if module isn't loaded yet
+                municipalityStatus.textContent = "Waiting for geo-enrichment module to load...";
+                
+                // Try again after a short delay
+                setTimeout(function checkGeoEnrichment() {
+                    if (window.geoEnrichment && window.geoEnrichment.initGeoEnrichment) {
+                        window.geoEnrichment.initGeoEnrichment(municipalityStatus);
+                    } else {
+                        municipalityStatus.textContent = "Error: Geo-enrichment module not loaded. Municipality detection disabled.";
+                        municipalityStatus.style.color = '#F44336';
+                    }
+                }, 1000);
+            }
+        });
+        
+        /**
+         * Handle file selection
+         */
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            
+            if (file) {
+                fileName.textContent = file.name;
+                status.textContent = 'File selected: ' + file.name;
+                status.className = 'info-box';
+                processButton.disabled = false;
+            } else {
+                fileName.textContent = '';
+                status.textContent = 'No file selected';
+                status.className = 'info-box warning';
+                processButton.disabled = true;
+            }
+            
+            // Reset buttons
+            downloadAllButton.disabled = true;
+            downloadActivitiesButton.disabled = true;
+            
+            // Reset previews
+            previewAll.innerHTML = 'Select and process a file to see a preview';
+            previewActivities.innerHTML = 'Select and process a file to see a preview';
+        }
+        
+        /**
+         * Process the selected JSON file
+         */
+        function processFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                status.textContent = 'Please select a file first.';
+                status.className = 'info-box warning';
+                return;
+            }
+            
+            // Reset data
+            processedData = [];
+            activityData = [];
+            
+            // Update UI
+            status.textContent = 'Processing file...';
+            status.className = 'info-box';
+            document.querySelector('.progress-container').style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            
+            // Disable process button during processing
+            processButton.disabled = true;
+            
+            // Start processing
+            fileReader.onload = function(event) {
+                try {
+                    let jsonContent;
+                    
+                    try {
+                        console.log('Parsing JSON file...');
+                        jsonContent = JSON.parse(event.target.result);
+                        console.log('Successfully parsed JSON');
+                    } catch (e) {
+                        // For very large files, we might need to handle the JSON manually
+                        console.log('Direct parsing failed, attempting stream processing');
+                        status.textContent = 'File is too large for direct parsing. Using stream processing...';
+                        
+                        // Try a manual approach for specific formats
+                        const rawContent = event.target.result;
+                        if (rawContent.includes('"locations":')) {
+                            // Standard Google format with locations array
+                            console.log('Found locations array in raw content');
+                            const locationsStartIndex = rawContent.indexOf('"locations":') + '"locations":'.length;
+                            const locationsEndIndex = rawContent.lastIndexOf(']');
+                            const locationsJson = rawContent.substring(locationsStartIndex, locationsEndIndex + 1);
+                            
+                            try {
+                                console.log('Parsing locations array...');
+                                const locations = JSON.parse(locationsJson);
+                                jsonContent = { locations: locations };
+                                console.log('Successfully parsed locations array');
+                            } catch (innerErr) {
+                                console.error('Failed to parse locations array:', innerErr);
+                                throw new Error('Failed to parse locations array: ' + innerErr.message);
+                            }
+                        } else {
+                            console.error('Cannot process this file format:', e.message);
+                            throw new Error('Cannot process this file format: ' + e.message);
+                        }
+                    }
+                    
+                    // Different Google formats with different structures
+                    console.log('Attempting to extract locations...');
+                    const locations = extractLocations(jsonContent);
+                    
+                    if (!locations || !locations.length) {
+                        console.error('No locations found in the extracted data');
+                        throw new Error('No location data found in the file.');
+                    }
+                    
+                    status.textContent = `Found ${locations.length} location entries. Processing...`;
+                    
+                    // Process in smaller batches to avoid blocking the UI
+                    const batchSize = 1000;
+                    const totalBatches = Math.ceil(locations.length / batchSize);
+                    
+                    let currentBatch = 0;
+                    let lastProgressReport = 0;
+                    
+                    function processBatch() {
+                        const startIdx = currentBatch * batchSize;
+                        const endIdx = Math.min(startIdx + batchSize, locations.length);
+                        
+                        for (let i = startIdx; i < endIdx; i++) {
+                            const entry = processLocationEntry(locations[i]);
+                            if (entry) {
+                                processedData.push(entry);
+                            }
+                        }
+                        
+                        currentBatch++;
+                        
+                        // Update progress
+                        const progress = Math.floor((currentBatch / totalBatches) * 100);
+                        if (progress > lastProgressReport) {
+                            progressBar.style.width = progress + '%';
+                            progressBar.textContent = progress + '%';
+                            lastProgressReport = progress;
+                        }
+                        
+                        if (currentBatch < totalBatches) {
+                            // Continue processing
+                            setTimeout(processBatch, 0);
+                        } else {
+                            // Processing complete
+                            finishProcessing();
+                        }
+                    }
+                    
+                    // Start batch processing
+                    setTimeout(processBatch, 0);
+                    
+                } catch (error) {
+                    console.error('Error processing file:', error);
+                    status.textContent = 'Error processing file: ' + error.message;
+                    status.className = 'info-box warning';
+                    processButton.disabled = false;
+                }
+            };
+            
+            fileReader.onerror = function() {
+                status.textContent = 'Error reading file.';
+                status.className = 'info-box warning';
+                processButton.disabled = false;
+            };
+            
+            fileReader.readAsText(file);
+        }
+        
+        /**
+         * Finish processing and update UI
+         */
+        function finishProcessing() {
+            // Process all activity data
+            extractActivities();
+            
+            // Enrich with municipality information if available
+            if (window.geoEnrichment && window.geoEnrichment.enrichWithMunicipalities) {
+                processedData = window.geoEnrichment.enrichWithMunicipalities(processedData);
+                activityData = window.geoEnrichment.enrichWithMunicipalities(activityData);
+            } else {
+                console.warn("Geo-enrichment module not available - municipality data will not be added");
+            }
+            
+            // Update UI
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            
+            // Re-enable buttons
+            processButton.disabled = false;
+            downloadAllButton.disabled = false;
+            downloadActivitiesButton.disabled = false;
+            
+            status.textContent = `Processed ${processedData.length} location entries (${activityData.length} activities).`;
+            status.className = 'info-box success';
+            
+            // Show preview for location data
+            showPreview(processedData.slice(0, 100), previewAll);
+            
+            // Show preview for activity data, even if empty - make sure to display a message
+            if (activityData.length > 0) {
+                showPreview(activityData.slice(0, 100), previewActivities);
+            } else {
+                previewActivities.innerHTML = '<div style="padding: 15px; background-color: #fff3e0; border-left: 4px solid #ff9800;">No activity data was found or derived from this file. Try a different file or format.</div>';
+            }
+            
+            // Expand results section
+            document.getElementById('resultsSection').classList.remove('collapsed');
+            document.getElementById('resultsToggle').classList.remove('collapsed');
+        }
+        
+        /**
+         * Extract location data from different Google formats
+         */
+        function extractLocations(jsonData) {
+            console.log('Attempting to extract locations from JSON data');
+            console.log('JSON data type:', typeof jsonData);
+            console.log('Is array?', Array.isArray(jsonData));
+            
+            // Check if it's an array of visit objects (new Timeline format)
+            if (Array.isArray(jsonData) && jsonData.length > 0 && (jsonData[0].visit || jsonData[0].activity)) {
+                console.log('Found Google Timeline format with visit/activity objects');
+                const locations = [];
+                
+                jsonData.forEach(obj => {
+                    // Extract visit data (locations)
+                    if (obj.visit && obj.visit.topCandidate) {
+                        const visit = obj.visit;
+                        const topCandidate = visit.topCandidate;
+                        
+                        // Extract coordinates from placeLocation (format: "geo:lat,lng")
+                        if (topCandidate.placeLocation) {
+                            const geoMatch = topCandidate.placeLocation.match(/geo:([-\d.]+),([-\d.]+)/);
+                            if (geoMatch) {
+                                locations.push({
+                                    startTime: obj.startTime,
+                                    endTime: obj.endTime,
+                                    latitude: parseFloat(geoMatch[1]),
+                                    longitude: parseFloat(geoMatch[2]),
+                                    accuracy: visit.accuracy || '',
+                                    semanticType: topCandidate.semanticType || '',
+                                    placeId: topCandidate.placeID || '',
+                                    probability: topCandidate.probability || '',
+                                    hierarchyLevel: visit.hierarchyLevel || '',
+                                    visitProbability: visit.probability || ''
+                                });
+                            }
+                        }
+                    }
+                    
+                    // Extract activity data (movements)
+                    if (obj.activity) {
+                        const activity = obj.activity;
+                        
+                        // Extract start location
+                        const startGeo = extractGeoCoordinates(activity.start);
+                        // Extract end location
+                        const endGeo = extractGeoCoordinates(activity.end);
+                        
+                        if (startGeo && endGeo) {
+                            // Create an activity entry with all the details
+                            locations.push({
+                                startTime: obj.startTime,
+                                endTime: obj.endTime,
+                                // Use start coordinates as the main coordinates
+                                latitude: startGeo.lat,
+                                longitude: startGeo.lng,
+                                // Include activity information
+                                activity_type: activity.topCandidate?.type || 'unknown',
+                                activity_probability: activity.topCandidate?.probability || '0',
+                                // Detailed start/end coordinates
+                                start_lat: startGeo.lat,
+                                start_lng: startGeo.lng,
+                                end_lat: endGeo.lat,
+                                end_lng: endGeo.lng,
+                                // Distance information
+                                distance_meters: activity.distanceMeters || '0',
+                                // Flag to identify as an activity record
+                                isActivitySegment: true
+                            });
+                        }
+                    }
+                });
+                
+                console.log('Extracted locations from visit/activity objects:', locations.length);
+                return locations;
+            }
+            
+            // Check for standard Google Takeout format
+            if (jsonData.locations && Array.isArray(jsonData.locations)) {
+                console.log('Found standard Google Takeout format with locations array');
+                console.log('Number of locations:', jsonData.locations.length);
+                return jsonData.locations;
+            }
+            
+            // Check for Google Timeline format with timelineObjects
+            if (jsonData.timelineObjects && Array.isArray(jsonData.timelineObjects)) {
+                console.log('Found Google Timeline format with timelineObjects');
+                console.log('Number of timeline objects:', jsonData.timelineObjects.length);
+                const locations = [];
+                
+                // Extract from activitySegment and placeVisit objects
+                jsonData.timelineObjects.forEach(obj => {
+                    if (obj.activitySegment) {
+                        // Extract start and end locations from activity segments
+                        const segment = obj.activitySegment;
+                        
+                        if (segment.startLocation) {
+                            locations.push({
+                                timestampMs: segment.duration?.startTimestampMs,
+                                latitudeE7: segment.startLocation.latitudeE7,
+                                longitudeE7: segment.startLocation.longitudeE7,
+                                accuracy: segment.startLocation.accuracy,
+                                activity: [
+                                    {
+                                        type: segment.activityType,
+                                        confidence: 100 // Default confidence for activity segments
+                                    }
+                                ]
+                            });
+                        }
+                        
+                        if (segment.endLocation) {
+                            locations.push({
+                                timestampMs: segment.duration?.endTimestampMs,
+                                latitudeE7: segment.endLocation.latitudeE7,
+                                longitudeE7: segment.endLocation.longitudeE7,
+                                accuracy: segment.endLocation.accuracy,
+                                activity: [
+                                    {
+                                        type: segment.activityType,
+                                        confidence: 100 // Default confidence for activity segments
+                                    }
+                                ]
+                            });
+                        }
+                        
+                        // Extract waypoints if available
+                        if (segment.waypointPath && Array.isArray(segment.waypointPath.waypoints)) {
+                            segment.waypointPath.waypoints.forEach((waypoint, index) => {
+                                if (waypoint.latE7 && waypoint.lngE7) {
+                                    // Estimate timestamp based on position in the list
+                                    const startTime = parseInt(segment.duration?.startTimestampMs || 0);
+                                    const endTime = parseInt(segment.duration?.endTimestampMs || 0);
+                                    const waypointCount = segment.waypointPath.waypoints.length;
+                                    const estimatedTime = startTime + ((endTime - startTime) * (index / waypointCount));
+                                    
+                                    locations.push({
+                                        timestampMs: String(estimatedTime),
+                                        latitudeE7: waypoint.latE7,
+                                        longitudeE7: waypoint.lngE7,
+                                        activity: [
+                                            {
+                                                type: segment.activityType,
+                                                confidence: 100 // Default confidence for waypoints
+                                            }
+                                        ]
+                                    });
+                                }
+                            });
+                        }
+                    }
+                    
+                    if (obj.placeVisit && obj.placeVisit.location) {
+                        // Extract location from place visits
+                        const visit = obj.placeVisit;
+                        locations.push({
+                            timestampMs: visit.duration?.startTimestampMs,
+                            latitudeE7: visit.location.latitudeE7,
+                            longitudeE7: visit.location.longitudeE7,
+                            accuracy: visit.location.accuracyMetres
+                        });
+                    }
+                });
+                
+                console.log('Extracted locations from timeline objects:', locations.length);
+                return locations;
+            }
+            
+            // Check for array-based format (some versions of Google data)
+            if (Array.isArray(jsonData)) {
+                console.log('Found array-based format');
+                const locations = jsonData.filter(item => 
+                    (item.latitudeE7 || item.latitude) && 
+                    (item.longitudeE7 || item.longitude)
+                );
+                console.log('Number of valid locations in array:', locations.length);
+                return locations;
+            }
+            
+            // Log available keys to help debug unknown formats
+            console.log('Unknown format. Available top-level keys:', Object.keys(jsonData));
+            throw new Error('Unsupported JSON format. Could not find location data.');
+        }
         
         /**
          * Extract geo coordinates from a string like "geo:40.338423,-3.777495"
@@ -170,1158 +858,476 @@
         }
         
         /**
-         * Process a raw location entry into a structured format
+         * Process a single location entry into our standardized format
          */
         function processLocationEntry(entry) {
-            try {
-                // Initialize an empty result object
-                const processed = {
-                    startTime: entry.startTime,
-                    endTime: entry.endTime
-                };
-                
-                // Make sure we capture coordinates in any form they appear
-                let hasLocationData = false;
-                
-                // Extract visit data if it exists
-                if (entry.visit && entry.visit.topCandidate) {
-                    const topCandidate = entry.visit.topCandidate;
-                    
-                    // Add semantic type if it exists
-                    if (topCandidate.semanticType) {
-                        processed.semanticType = topCandidate.semanticType;
-                    }
-                    
-                    // Add probability if it exists
-                    if (topCandidate.probability) {
-                        processed.probability = parseFloat(topCandidate.probability);
-                    }
-                    
-                    // Add placeID if it exists
-                    if (topCandidate.placeID) {
-                        processed.placeID = topCandidate.placeID;
-                    }
-                    
-                    // Extract lat/long from placeLocation if it exists
-                    const geoData = extractGeoCoordinates(topCandidate.placeLocation);
-                    if (geoData) {
-                        processed.latitude = geoData.lat;
-                        processed.longitude = geoData.lng;
-                        hasLocationData = true;
-                    }
-                }
-                
-                // If we have location directly on the entry, use it (sometimes there's lat/long directly)
-                if (entry.latitudeE7 !== undefined && entry.longitudeE7 !== undefined) {
-                    processed.latitude = entry.latitudeE7 / 10000000;
-                    processed.longitude = entry.longitudeE7 / 10000000;
-                    hasLocationData = true;
-                } else if (entry.latitude !== undefined && entry.longitude !== undefined) {
-                    processed.latitude = parseFloat(entry.latitude);
-                    processed.longitude = parseFloat(entry.longitude);
-                    hasLocationData = true;
-                }
-                
-                // Add activity data if it exists
-                if (entry.activity) {
-                    const activity = entry.activity;
-                    
-                    // Extract start geo coordinates
-                    const startGeo = extractGeoCoordinates(activity.start);
-                    if (startGeo) {
-                        processed.start_lat = startGeo.lat;
-                        processed.start_lng = startGeo.lng;
-                        
-                        // If we don't have main coordinates yet, use these
-                        if (!hasLocationData) {
-                            processed.latitude = startGeo.lat;
-                            processed.longitude = startGeo.lng;
-                            hasLocationData = true;
-                        }
-                    }
-                    
-                    // Extract end geo coordinates
-                    const endGeo = extractGeoCoordinates(activity.end);
-                    if (endGeo) {
-                        processed.end_lat = endGeo.lat;
-                        processed.end_lng = endGeo.lng;
-                        
-                        // If we still don't have coordinates, use end point
-                        if (!hasLocationData) {
-                            processed.latitude = endGeo.lat;
-                            processed.longitude = endGeo.lng;
-                            hasLocationData = true;
-                        }
-                    }
-                    
-                    // Extract distance
-                    if (activity.distanceMeters) {
-                        processed.distance_meters = parseFloat(activity.distanceMeters);
-                    }
-                    
-                    // Extract topCandidate data
-                    if (activity.topCandidate) {
-                        if (activity.topCandidate.type) {
-                            processed.activity_type = activity.topCandidate.type;
-                        }
-                        if (activity.topCandidate.probability) {
-                            processed.activity_probability = parseFloat(activity.topCandidate.probability);
-                        }
-                    }
-                }
-                
-                // Add activity segment data if it exists
-                if (entry.activitySegment) {
-                    const segment = entry.activitySegment;
-                    
-                    if (segment.activities && segment.activities.length > 0) {
-                        // Get the first activity
-                        const firstActivity = segment.activities[0];
-                        if (firstActivity.activityType) {
-                            processed.activityType = firstActivity.activityType;
-                        }
-                        if (firstActivity.probability) {
-                            processed.activityConfidence = parseFloat(firstActivity.probability);
-                        }
-                    }
-                    
-                    // Add any other activitySegment fields that might be useful
-                    if (segment.distance) {
-                        processed.segment_distance = segment.distance;
-                    }
-                    if (segment.duration) {
-                        processed.segment_duration = segment.duration;
-                    }
-                    if (segment.activityType) {
-                        processed.segment_activityType = segment.activityType;
-                    }
-                    if (segment.confidence) {
-                        processed.segment_confidence = segment.confidence;
-                    }
-                }
-                
-                return processed;
-            } catch (error) {
-                console.error('Error processing entry:', error, entry);
-                // Return at least the timestamps if available
-                return {
-                    startTime: entry.startTime,
-                    endTime: entry.endTime,
-                    error: 'Failed to process this entry'
-                };
-            }
-        }
-        
-        /**
-         * Process a new format Google Location History JSON
-         */
-        function processNewFormat(data) {
-            const results = [];
-            
-            if (!data.locations || !Array.isArray(data.locations)) {
-                throw new Error("No locations array found in new format data");
-            }
-            
-            data.locations.forEach(loc => {
-                // Convert E7 format to decimal degrees
-                const latitude = loc.latitudeE7 ? loc.latitudeE7 / 10000000 : null;
-                const longitude = loc.longitudeE7 ? loc.longitudeE7 / 10000000 : null;
-                
-                // Use timestamp or timestampMs
-                const timestamp = loc.timestamp || loc.timestampMs;
-                
-                results.push({
-                    startTime: timestamp,
-                    endTime: timestamp,
-                    latitude: latitude,
-                    longitude: longitude,
-                    accuracy: loc.accuracy,
-                    altitude: loc.altitude,
-                    source: "Google Location History (new format)"
-                });
-            });
-            
-            return results;
-        }
-        
-        /**
-         * Process a JSON file
-         */
-        async function processLocationFile(file, onProgress) {
-            const selectedFormat = document.querySelector('input[name="format"]:checked').value;
-            
-            return new Promise((resolve, reject) => {
-                const fileReader = new FileReader();
-                
-                fileReader.onload = () => {
-                    try {
-                        // Get the text content
-                        const jsonText = fileReader.result;
-                        const trimmedText = jsonText.toString().trim();
-                        
-                        onProgress({ message: "File loaded, starting JSON parsing..." });
-                        
-                        // Detect format and parse accordingly
-                        let data;
-                        
-                        try {
-                            // Parse the JSON
-                            data = JSON.parse(trimmedText);
-                            onProgress({ message: "JSON parsed successfully, processing entries..." });
-                            
-                            // Handle different formats based on structure
-                            if (selectedFormat === 'array' || Array.isArray(data)) {
-                                // Handle array format
-                                const entries = Array.isArray(data) ? data : [];
-                                const results = [];
-                                
-                                // Process each entry directly without streaming
-                                const totalEntries = entries.length;
-                                
-                                for (let i = 0; i < totalEntries; i++) {
-                                    const processed = processLocationEntry(entries[i]);
-                                    results.push(processed);
-                                    
-                                    // Update progress every 1000 entries or so
-                                    if (i % 1000 === 0 || i === totalEntries - 1) {
-                                        const percent = Math.round((i + 1) / totalEntries * 100);
-                                        onProgress({ message: `Processing: ${i + 1} of ${totalEntries} entries (${percent}%)` });
-                                        progressBar.value = percent;
-                                    }
-                                }
-                                
-                                resolve({
-                                    data: results,
-                                    message: `Successfully processed ${results.length} location entries from array format.`
-                                });
-                            } else if (data.locations && Array.isArray(data.locations)) {
-                                // New Google format with locations array
-                                onProgress({ message: "Detected new Google format. Processing..." });
-                                const results = processNewFormat(data);
-                                
-                                resolve({
-                                    data: results,
-                                    message: `Successfully processed ${results.length} location entries from new Google format.`
-                                });
-                            } else if (data.item && Array.isArray(data.item)) {
-                                // Standard format with "item" array
-                                const entries = data.item;
-                                const results = [];
-                                const totalEntries = entries.length;
-                                
-                                for (let i = 0; i < totalEntries; i++) {
-                                    const processed = processLocationEntry(entries[i]);
-                                    results.push(processed);
-                                    
-                                    if (i % 1000 === 0 || i === totalEntries - 1) {
-                                        const percent = Math.round((i + 1) / totalEntries * 100);
-                                        onProgress({ message: `Processing: ${i + 1} of ${totalEntries} entries (${percent}%)` });
-                                        progressBar.value = percent;
-                                    }
-                                }
-                                
-                                resolve({
-                                    data: results,
-                                    message: `Successfully processed ${results.length} location entries from object format.`
-                                });
-                            } else {
-                                reject({
-                                    error: "Unrecognized JSON structure",
-                                    details: "Could not find location data in expected format. Try changing the format option above.",
-                                    data: []
-                                });
-                            }
-                        } catch (parseError) {
-                            console.error("JSON parsing error:", parseError);
-                            reject({
-                                error: "Error parsing JSON file",
-                                details: `JSON syntax error: ${parseError.message}. Check if your file is properly formatted.`,
-                                data: []
-                            });
-                        }
-                    } catch (error) {
-                        console.error("General processing error:", error);
-                        reject({
-                            error: "Error processing file",
-                            details: error.message || "Unknown error occurred",
-                            data: []
-                        });
-                    }
-                };
-                
-                fileReader.onerror = () => {
-                    reject({
-                        error: "Error reading file",
-                        details: "The browser couldn't read the file. It might be too large or corrupted.",
-                        data: []
-                    });
-                };
-                
-                // Start reading the file
-                fileReader.readAsText(file);
-            });
-        }
-        
-        /**
-         * Generate a CSV file from location entries
-         */
-        function generateCSV(data) {
-            // Check if we actually have data
-            if (!data || data.length === 0) {
-                console.error('No data to convert to CSV');
-                return '';
-            }
-            
-            console.log(`Generating CSV for ${data.length} entries`);
-            
-            // Identify the type of data and create appropriate column order
-            const isActivityData = data[0].hasOwnProperty('start_lat') || data[0].hasOwnProperty('end_lat');
-            
-            // Define column order for better readability
-            const columnOrder = isActivityData ? [
-                // Time information
-                'startTime', 'endTime', 'duration_minutes',
-                
-                // Location information
-                'latitude', 'longitude', 
-                
-                // Administrative hierarchy
-                'country', 'region', 'province', 'municipality',
-                
-                // Activity details
-                'activity_type', 'activity_probability',
-                
-                // Start location
-                'start_lat', 'start_lng', 
-                'start_country', 'start_region', 'start_province', 'start_municipality',
-                
-                // End location
-                'end_lat', 'end_lng',
-                'end_country', 'end_region', 'end_province', 'end_municipality',
-                
-                // Distance information
-                'distance_meters', 'distance_km', 'speed_kph',
-                
-                // Additional details
-                'placeID', 'semanticType'
-            ] : [
-                // Basic information
-                'startTime', 'endTime',
-                
-                // Location 
-                'latitude', 'longitude',
-                
-                // Administrative hierarchy
-                'country', 'region', 'province', 'municipality',
-                
-                // Visit information
-                'semanticType', 'probability', 'placeID',
-                
-                // Activity data if exists
-                'activity_type', 'activity_probability',
-                'start_lat', 'start_lng', 
-                'start_country', 'start_region', 'start_province', 'start_municipality',
-                'end_lat', 'end_lng',
-                'end_country', 'end_region', 'end_province', 'end_municipality',
-                'distance_meters'
-            ];
-            
-            // Create field definitions for Papa Parse
-            const fields = columnOrder.filter(field => 
-                // Only include fields that exist in at least one data entry
-                data.some(entry => entry[field] !== undefined)
-            );
-            
-            // Generate the CSV
-            const options = {
-                header: true,
-                skipEmptyLines: true,
-                columns: fields
-            };
-            
-            return Papa.unparse(data, options);
-        }
-        
-        /**
-         * Download the generated CSV as a file
-         */
-        function downloadCSV(csvContent, filename = 'location-history.csv') {
-            // Create blob and URL
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            // Create a temporary link and trigger download
-            const link = document.createElement('a');
-            link.setAttribute('href', url);
-            link.setAttribute('download', filename);
-            link.style.visibility = 'hidden';
-            
-            document.body.appendChild(link);
-            link.click();
-            
-            // Clean up
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-        
-        /**
-         * Extract only activity data entries and format for CSV
-         */
-        function extractActivityData(data) {
-            // Filter entries that have activity data
-            const activityEntries = data.filter(entry => 
-                entry.activity_type || 
-                entry.start_lat || 
-                entry.end_lat || 
-                entry.distance_meters ||
-                entry.activityType
-            );
-            
-            console.log(`Found ${activityEntries.length} entries with activity data out of ${data.length} total entries`);
-            
-            // Map to a cleaner format focused on activity data
-            return activityEntries.map(entry => {
-                // Calculate distance in kilometers
-                const distanceKm = entry.distance_meters ? (entry.distance_meters / 1000) : null;
-                
-                // Calculate time variables
-                let speedKph = null;
-                let durationMinutes = null;
-                
-                if (entry.startTime && entry.endTime) {
-                    try {
-                        // Parse timestamps
-                        const startDate = new Date(entry.startTime);
-                        const endDate = new Date(entry.endTime);
-                        
-                        // Calculate duration in minutes and hours
-                        durationMinutes = (endDate - startDate) / (1000 * 60);
-                        const durationHours = durationMinutes / 60;
-                        
-                        // Calculate speed if duration and distance are valid
-                        if (durationHours > 0 && distanceKm) {
-                            speedKph = distanceKm / durationHours;
-                        }
-                    } catch (e) {
-                        console.error('Error calculating time metrics:', e);
-                    }
-                }
-                
-                // Create the processed entry with all relevant fields
-                return {
-                    startTime: entry.startTime,
-                    endTime: entry.endTime,
-                    duration_minutes: durationMinutes !== null ? durationMinutes.toFixed(1) : null,
-                    
-                    // Include main location if available
-                    latitude: entry.latitude,
-                    longitude: entry.longitude,
-                    municipality: entry.municipality,
-                    
-                    // Activity type and details
-                    activity_type: entry.activity_type || entry.activityType || 'unknown',
-                    activity_probability: entry.activity_probability || entry.activityConfidence || 0,
-                    
-                    // Start coordinates
-                    start_lat: entry.start_lat || null,
-                    start_lng: entry.start_lng || null,
-                    start_municipality: entry.start_municipality || null,
-                    
-                    // End coordinates
-                    end_lat: entry.end_lat || null,
-                    end_lng: entry.end_lng || null,
-                    end_municipality: entry.end_municipality || null,
-                    
-                    // Distance metrics
-                    distance_meters: entry.distance_meters || null,
-                    distance_km: distanceKm !== null ? distanceKm.toFixed(3) : null,
-                    speed_kph: speedKph !== null ? speedKph.toFixed(2) : null,
-                    
-                    // Other activity data
-                    placeID: entry.placeID || null,
-                    semanticType: entry.semanticType || null
-                };
-            });
-        }
-        
-        // Event Handlers
-        function handleFileSelect(event) {
-            const files = fileInput.files;
-            if (files && files.length > 0) {
-                processFile(files[0]);
-            }
-        }
-        
-        function handleDrop(event) {
-            event.preventDefault();
-            uploadArea.classList.remove('highlight');
-            
-            const files = event.dataTransfer?.files;
-            if (files && files.length > 0) {
-                processFile(files[0]);
-            }
-        }
-        
-        function handleDragOver(event) {
-            event.preventDefault();
-            uploadArea.classList.add('highlight');
-        }
-        
-        function handleDragLeave(event) {
-            event.preventDefault();
-            uploadArea.classList.remove('highlight');
-        }
-        
-        async function processFile(file) {
-            // Only accept JSON files
-            if (!file.name.endsWith('.json')) {
-                alert('Please select a JSON file from Google Location History.');
-                return;
-            }
-            
-            // Update UI for processing
-            uploadArea.style.display = 'none';
-            document.getElementById('formatSelector').style.display = 'none';
-            progressContainer.style.display = 'block';
-            downloadBtn.style.display = 'none';
-            downloadActivityBtn.style.display = 'none';
-            
-            // Show file info
-            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            statusElement.textContent = `Reading file: ${file.name} (${fileSizeMB} MB)`;
-            progressBar.value = 0;
-            
-            try {
-                // Start processing
-                const result = await processLocationFile(file, updateProgress);
-                processedData = result.data;
-                
-                // Enrich with municipality data if available
-                if (municipalityPolygons) {
-                    statusElement.textContent = 'Enriching data with municipality names...';
-                    processedData = enrichWithMunicipalities(processedData);
-                }
-                
-                // Update UI after processing
-                const successMessage = result.message || `Processed ${result.data.length} location entries successfully!`;
-                statusElement.textContent = successMessage;
-                downloadBtn.style.display = 'inline-block';
-                // Show activity button if we have activity data
-                const hasActivityData = result.data.some(entry => entry.activity_type || entry.start_lat || entry.end_lat || entry.distance_meters);
-                downloadActivityBtn.style.display = hasActivityData ? 'inline-block' : 'none';
-            } catch (error) {
-                console.error('Processing error:', error);
-                
-                // Show the error message
-                const errorTitle = error.error || 'Unknown error processing file';
-                const errorDetails = error.details || '';
-                
-                // Create a more user-friendly error display
-                statusElement.innerHTML = `
-                    <div style="color: #d32f2f; margin-bottom: 10px; font-weight: bold;">
-                        ${errorTitle}
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        ${errorDetails}
-                    </div>
-                    <div>
-                        <button id="resetBtn" style="background-color: #757575; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Try Again</button>
-                    </div>
-                `;
-                
-                // Add reset button functionality
-                const resetBtn = document.getElementById('resetBtn');
-                if (resetBtn) {
-                    resetBtn.addEventListener('click', () => {
-                        uploadArea.style.display = 'block';
-                        document.getElementById('formatSelector').style.display = 'block';
-                        progressContainer.style.display = 'none';
-                        downloadBtn.style.display = 'none';
-                        downloadActivityBtn.style.display = 'none';
-                    });
-                }
-                
-                // If we have partial data, still allow download
-                if (error.data && error.data.length > 0) {
-                    processedData = error.data;
-                    downloadBtn.style.display = 'inline-block';
-                    downloadActivityBtn.style.display = 'inline-block';
-                    statusElement.innerHTML += `
-                        <div style="margin-top: 15px; color: #2e7d32;">
-                            Partial data with ${error.data.length} entries is available for download
-                        </div>
-                    `;
-                }
-            }
-        }
-        
-        function updateProgress(stats) {
-            if (stats.message) {
-                statusElement.textContent = stats.message;
-            }
-        }
-        
-        function handleDownload() {
-            if (processedData.length === 0) {
-                alert('No data available to download.');
-                return;
-            }
-            
-            statusElement.textContent = 'Generating CSV file...';
-            
-            try {
-                // Generate and download the CSV
-                const csvContent = generateCSV(processedData);
-                downloadCSV(csvContent);
-                
-                statusElement.textContent = 'CSV file downloaded successfully!';
-                
-                // Add info about enrichment if applied
-                if (municipalityPolygons) {
-                    const municipalityCount = processedData.filter(e => e.municipality).length;
-                    if (municipalityCount > 0) {
-                        statusElement.textContent += ` Includes ${municipalityCount} entries with municipality data.`;
-                    }
-                }
-            } catch (error) {
-                console.error('CSV generation error:', error);
-                statusElement.innerHTML = `
-                    <div style="color: #d32f2f; margin-bottom: 10px;">
-                        Error generating CSV: ${error.message || 'Unknown error'}
-                    </div>
-                    <div>
-                        Please try again or try with a smaller file.
-                    </div>
-                `;
-            }
-        }
-        
-        function handleActivityDownload() {
-            if (processedData.length === 0) {
-                alert('No data available to download.');
-                return;
-            }
-            
-            statusElement.textContent = 'Generating Activity CSV file...';
-            
-            try {
-                // Extract and format activity data
-                const activityData = extractActivityData(processedData);
-                
-                if (activityData.length === 0) {
-                    statusElement.innerHTML = `
-                        <div style="color: #d32f2f; margin-bottom: 10px;">
-                            No activity data found in the processed entries.
-                        </div>
-                    `;
-                    return;
-                }
-                
-                // Generate and download the CSV
-                const csvContent = generateCSV(activityData);
-                downloadCSV(csvContent, 'location-activity-data.csv');
-                
-                statusElement.textContent = `Activity CSV file with ${activityData.length} entries downloaded successfully!`;
-                
-                // Add info about enrichment if applied
-                if (municipalityPolygons) {
-                    const startMunicipalityCount = activityData.filter(e => e.start_municipality).length;
-                    const endMunicipalityCount = activityData.filter(e => e.end_municipality).length;
-                    if (startMunicipalityCount > 0 || endMunicipalityCount > 0) {
-                        statusElement.textContent += ` Includes municipality data for ${startMunicipalityCount} start points and ${endMunicipalityCount} end points.`;
-                    }
-                }
-            } catch (error) {
-                console.error('Activity CSV generation error:', error);
-                statusElement.innerHTML = `
-                    <div style="color: #d32f2f; margin-bottom: 10px;">
-                        Error generating Activity CSV: ${error.message || 'Unknown error'}
-                    </div>
-                    <div>
-                        Please try again.
-                    </div>
-                `;
-            }
-        }
-        
-        // Initialize Event Listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            // File selection button
-            selectFileBtn.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', handleFileSelect);
-            
-            // Drag and drop
-            uploadArea.addEventListener('dragover', handleDragOver);
-            uploadArea.addEventListener('dragleave', handleDragLeave);
-            uploadArea.addEventListener('drop', handleDrop);
-            
-            // Download buttons
-            downloadBtn.addEventListener('click', handleDownload);
-            downloadActivityBtn.addEventListener('click', handleActivityDownload);
-            
-            // Automatically load municipality data
-            autoLoadGeoJson();
-        });
-        
-        /**
-         * Loads GeoJSON data and processes the boundaries
-         */
-        let municipalityPolygons = null;
-        let municipalityNameField = 'NAME_4';  // Default field name in GADM data
-        
-        /**
-         * Automatically load the GeoJSON file for Spain from the server
-         */
-        function autoLoadGeoJson() {
-            const statusElement = document.getElementById('geoJsonStatus');
-            statusElement.textContent = 'Loading Spain municipality boundaries...';
-            statusElement.style.color = '#666';
-            
-            try {
-                // Instead of loading from external file, use the URL with CORS support
-                const gadmUrl = 'https://geodata.ucdavis.edu/gadm/gadm4.1/json/gadm41_ESP_4.json';
-                
-                fetch(gadmUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(geojson => {
-                        // Process the GeoJSON data
-                        municipalityPolygons = geojson;
-                        statusElement.textContent = `✓ Loaded ${geojson.features ? geojson.features.length : 0} Spain municipality boundaries.`;
-                        statusElement.style.color = '#2e7d32';
-                        
-                        // Enrich any already processed data
-                        if (processedData.length > 0) {
-                            processedData = enrichWithMunicipalities(processedData);
-                            statusElement.textContent += ` - Enriched ${processedData.length} entries with municipality data.`;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error loading GeoJSON from URL:', error);
-                        loadFallbackGeoJson(statusElement);
-                    });
-            } catch (error) {
-                console.error('Error setting up GeoJSON fetch:', error);
-                loadFallbackGeoJson(statusElement);
-            }
-        }
-        
-        /**
-         * Fallback to load a simplified version embedded in the page
-         */
-        function loadFallbackGeoJson(statusElement) {
-            statusElement.textContent = 'Loading simplified Spanish regions...';
-            
-            // Create a more comprehensive coverage of Spain with smaller, regional areas
-            // This provides actual municipality names rather than just province names
-            const simplifiedGeoJson = {
-                "type": "FeatureCollection",
-                "features": [
-                    // Andalucía region with major municipalities and more coverage points
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Málaga",
-                            "NAME_4": "Málaga" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.4214, 36.7213] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Málaga",
-                            "NAME_4": "Marbella" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.8858, 36.5097] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Málaga",
-                            "NAME_4": "Antequera" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.5598, 37.0187] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Granada",
-                            "NAME_4": "Granada" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-3.5986, 37.1773] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Córdoba",
-                            "NAME_4": "Córdoba" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.7794, 37.8882] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Sevilla",
-                            "NAME_4": "Sevilla" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-5.9845, 37.3891] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Cádiz",
-                            "NAME_4": "Cádiz" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-6.3010, 36.5298] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Jaén",
-                            "NAME_4": "Jaén" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-3.7903, 37.7796] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Huelva",
-                            "NAME_4": "Huelva" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-6.9447, 37.2614] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Andalucía", 
-                            "NAME_2": "Almería",
-                            "NAME_4": "Almería" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-2.4637, 36.8381] }
-                    },
-                    // Madrid region
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Madrid", 
-                            "NAME_2": "Madrid",
-                            "NAME_4": "Madrid" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-3.7038, 40.4168] }
-                    },
-                    // Cataluña region
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Cataluña", 
-                            "NAME_2": "Barcelona",
-                            "NAME_4": "Barcelona" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [2.1734, 41.3851] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Cataluña", 
-                            "NAME_2": "Girona",
-                            "NAME_4": "Girona" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [2.8214, 41.9818] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Cataluña", 
-                            "NAME_2": "Lleida",
-                            "NAME_4": "Lleida" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [0.6267, 41.6178] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Cataluña", 
-                            "NAME_2": "Tarragona",
-                            "NAME_4": "Tarragona" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [1.2444, 41.1188] }
-                    },
-                    // Comunidad Valenciana
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Comunidad Valenciana", 
-                            "NAME_2": "Valencia",
-                            "NAME_4": "Valencia" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-0.3763, 39.4699] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Comunidad Valenciana", 
-                            "NAME_2": "Alicante",
-                            "NAME_4": "Alicante" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-0.4813, 38.3452] }
-                    },
-                    // Aragón region
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Aragón", 
-                            "NAME_2": "Zaragoza",
-                            "NAME_4": "Zaragoza" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-0.8890, 41.6488] }
-                    },
-                    // Galicia region
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain", 
-                            "NAME_1": "Galicia",
-                            "NAME_2": "A Coruña",
-                            "NAME_4": "A Coruña" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-8.3959, 43.3623] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain", 
-                            "NAME_1": "Galicia",
-                            "NAME_2": "Pontevedra",
-                            "NAME_4": "Vigo" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-8.7207, 42.2406] }
-                    },
-                    // País Vasco region
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "País Vasco", 
-                            "NAME_2": "Vizcaya",
-                            "NAME_4": "Bilbao" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-2.9350, 43.2630] }
-                    },
-                    // Add more regions to improve coverage
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Castilla-La Mancha", 
-                            "NAME_2": "Toledo",
-                            "NAME_4": "Toledo" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.0273, 39.8628] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Castilla y León", 
-                            "NAME_2": "Valladolid",
-                            "NAME_4": "Valladolid" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-4.7262, 41.6523] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Murcia", 
-                            "NAME_2": "Murcia",
-                            "NAME_4": "Murcia" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-1.1307, 37.9922] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { 
-                            "NAME_0": "Spain",
-                            "NAME_1": "Extremadura", 
-                            "NAME_2": "Badajoz",
-                            "NAME_4": "Badajoz" 
-                        },
-                        "geometry": { "type": "Point", "coordinates": [-6.9706, 38.8794] }
-                    }
-                ]
-            };
-            
-            municipalityPolygons = simplifiedGeoJson;
-            statusElement.textContent = `✓ Loaded Spanish municipalities (${simplifiedGeoJson.features.length} areas).`;
-            statusElement.style.color = '#FF9800';
-            
-            // Enrich any already processed data
-            if (processedData.length > 0) {
-                processedData = enrichWithMunicipalities(processedData);
-                statusElement.textContent += ` - Enriched nearby entries.`;
-            }
-        }
-        
-        /**
-         * Enrich location data with all location hierarchy levels
-         */
-        function enrichWithMunicipalities(data) {
-            if (!municipalityPolygons) {
-                console.warn('No municipality polygons available for enrichment');
-                return data;
-            }
-            
-            let enrichedCount = 0;
-            
-            const enriched = data.map(entry => {
-                // For regular entries, use main lat/long
-                if (entry.latitude !== undefined && entry.longitude !== undefined) {
-                    const locationData = findMunicipality(entry.latitude, entry.longitude);
-                    if (locationData) {
-                        // Add all location hierarchy levels
-                        entry.country = locationData.country;
-                        entry.region = locationData.region;
-                        entry.province = locationData.province;
-                        entry.municipality = locationData.municipality;
-                        enrichedCount++;
-                    }
-                }
-                // For activity entries, use start coordinates if main not available
-                else if (entry.start_lat !== undefined && entry.start_lng !== undefined) {
-                    const startLocationData = findMunicipality(entry.start_lat, entry.start_lng);
-                    if (startLocationData) {
-                        // Add location data for start point
-                        entry.start_country = startLocationData.country;
-                        entry.start_region = startLocationData.region;
-                        entry.start_province = startLocationData.province;
-                        entry.start_municipality = startLocationData.municipality;
-                        
-                        // Also add main location data for better CSV output
-                        entry.country = startLocationData.country;
-                        entry.region = startLocationData.region;
-                        entry.province = startLocationData.province;
-                        entry.municipality = startLocationData.municipality;
-                        enrichedCount++;
-                    }
-                }
-                
-                // Add end location data for activities if coordinates exist
-                if (entry.end_lat !== undefined && entry.end_lng !== undefined) {
-                    const endLocationData = findMunicipality(entry.end_lat, entry.end_lng);
-                    if (endLocationData) {
-                        entry.end_country = endLocationData.country;
-                        entry.end_region = endLocationData.region;
-                        entry.end_province = endLocationData.province;
-                        entry.end_municipality = endLocationData.municipality;
-                        enrichedCount++;
-                    }
-                }
-                
-                return entry;
-            });
-            
-            console.log(`Enriched ${enrichedCount} location points with location data out of ${data.length} total entries`);
-            return enriched;
-        }
-        
-        /**
-         * Find municipality for a given point
-         */
-        function findMunicipality(lat, lng) {
-            if (!municipalityPolygons || !municipalityPolygons.features) {
+            // Skip entries without coordinates
+            if (!entry.latitude && !entry.longitude && !entry.latitudeE7 && !entry.longitudeE7) {
                 return null;
             }
             
-            const point = turf.point([lng, lat]);
+            // Convert E7 format if needed (Google uses integer E7 format)
+            const latitude = entry.latitudeE7 ? (entry.latitudeE7 / 10000000) : 
+                             (typeof entry.latitude === 'number' ? entry.latitude : parseFloat(entry.latitude));
             
-            // First attempt to find precise polygon match
-            let result = null;
-            let matchDistance = Infinity;
+            const longitude = entry.longitudeE7 ? (entry.longitudeE7 / 10000000) : 
+                              (typeof entry.longitude === 'number' ? entry.longitude : parseFloat(entry.longitude));
             
-            for (const feature of municipalityPolygons.features) {
-                // For polygon geometries (the normal case from GADM data)
-                if (feature.geometry && feature.geometry.type.includes('Polygon') && 
-                    turf.booleanPointInPolygon(point, feature.geometry)) {
-                    // Return an object with all admin levels
-                    return {
-                        country: feature.properties.NAME_0 || 'Spain',
-                        region: feature.properties.NAME_1,
-                        province: feature.properties.NAME_2,
-                        municipality: feature.properties.NAME_4 || feature.properties.NAME_3
-                    };
+            // Skip invalid coordinates
+            if (isNaN(latitude) || isNaN(longitude) || 
+                latitude < -90 || latitude > 90 || 
+                longitude < -180 || longitude > 180) {
+                return null;
+            }
+            
+            // Process timestamps - handle ISO-8601 format
+            let timestampStr;
+            
+            // For the new timeline format with ISO timestamps
+            if (entry.startTime) {
+                // Use startTime as the main timestamp
+                try {
+                    const parsedDate = new Date(entry.startTime);
+                    if (!isNaN(parsedDate.getTime())) {
+                        // Format the timestamp as YYYY-MM-DD HH:MM:SS
+                        timestampStr = parsedDate.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                    } else {
+                        timestampStr = entry.startTime; // Keep original if parsing fails
+                    }
+                } catch (e) {
+                    console.warn('Error parsing startTime:', entry.startTime, e);
+                    timestampStr = entry.startTime;
                 }
+            } 
+            // For older formats with millisecond timestamp
+            else if (entry.timestampMs) {
+                try {
+                    const timestamp = new Date(parseInt(entry.timestampMs));
+                    timestampStr = timestamp.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                } catch (e) {
+                    console.warn('Error parsing timestampMs:', entry.timestampMs, e);
+                    timestampStr = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                }
+            } 
+            // Fallback
+            else {
+                timestampStr = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+            }
+            
+            // Extract activity information
+            let activityType = '';
+            let activityConfidence = '';
+            
+            // Handle explicit activity type from the activity entry
+            if (entry.activity_type) {
+                activityType = entry.activity_type;
+                activityConfidence = entry.activity_probability || '';
+            }
+            // Handle activity array from standard Google format
+            else if (entry.activity && entry.activity.length > 0) {
+                // Find the most likely activity
+                let highestConfidence = -1;
                 
-                // For the simplified version with points
-                if (feature.geometry && feature.geometry.type === 'Point') {
-                    // Create a coverage buffer around the point
-                    // Smaller buffer (25km) for more precise municipality assignment
-                    const buffer = turf.buffer(feature.geometry, 25, {units: 'kilometers'});
-                    
-                    if (turf.booleanPointInPolygon(point, buffer)) {
-                        // If we're within the buffer, calculate distance to center
-                        const distance = turf.distance(
-                            point, 
-                            turf.point(feature.geometry.coordinates), 
-                            {units: 'kilometers'}
-                        );
-                        
-                        // Keep track of the closest match
-                        if (distance < matchDistance) {
-                            matchDistance = distance;
-                            result = {
-                                country: feature.properties.NAME_0 || 'Spain',
-                                region: feature.properties.NAME_1,
-                                province: feature.properties.NAME_2,
-                                municipality: feature.properties.NAME_4
-                            };
+                for (const activity of entry.activity) {
+                    if (activity.activities && activity.activities.length > 0) {
+                        // Standard Google format with activities array
+                        for (const subActivity of activity.activities) {
+                            if (subActivity.confidence > highestConfidence) {
+                                highestConfidence = subActivity.confidence;
+                                activityType = subActivity.type;
+                                activityConfidence = subActivity.confidence;
+                            }
+                        }
+                    } else if (activity.type) {
+                        // Simplified format
+                        const confidence = activity.confidence || 100;
+                        if (confidence > highestConfidence) {
+                            highestConfidence = confidence;
+                            activityType = activity.type;
+                            activityConfidence = confidence;
                         }
                     }
                 }
             }
             
-            // For points that are in Spain but outside our detailed coverage
-            // Assign to the closest major region if within reasonable distance (100km)
-            if (!result && matchDistance < 100) {
-                return {
-                    country: 'Spain',
-                    region: 'Unknown Region',
-                    province: 'Unknown Province',
-                    municipality: 'Unknown Municipality'
-                };
+            // Create standardized record with probability fields
+            const result = {
+                timestamp: timestampStr,
+                latitude: latitude.toFixed(6),
+                longitude: longitude.toFixed(6),
+                country: entry.country || '',
+                region: entry.region || '',
+                province: entry.province || '',
+                municipality: entry.municipality || '',
+                placeID: entry.placeId || '',
+                semanticType: entry.semanticType || '',
+                probability: entry.probability || '',
+                visitProbability: entry.visitProbability || ''
+            };
+            
+            // Add extra fields for activity records
+            if (entry.isActivitySegment) {
+                result.startTime = entry.startTime;
+                result.endTime = entry.endTime;
+                result.start_lat = entry.start_lat;
+                result.start_lng = entry.start_lng;
+                result.end_lat = entry.end_lat; 
+                result.end_lng = entry.end_lng;
+                result.distance_meters = entry.distance_meters;
+                result.activity_type = activityType;
+                result.activity_probability = activityConfidence;
+            } 
+            // Add fields for visit records
+            else if (entry.startTime && entry.endTime) {
+                result.startTime = entry.startTime;
+                result.endTime = entry.endTime;
+                
+                // Parse the ISO dates for duration calculation
+                try {
+                    const start = new Date(entry.startTime);
+                    const end = new Date(entry.endTime);
+                    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        const durationMs = end - start;
+                        result.duration_minutes = (durationMs / 60000).toFixed(2);
+                    }
+                } catch (e) {
+                    console.warn('Error calculating duration:', e);
+                }
             }
             
             return result;
+        }
+        
+        /**
+         * Extract activities from the processed data
+         */
+        function extractActivities() {
+            // Reset activity data
+            activityData = [];
+            
+            if (processedData.length === 0) {
+                return;
+            }
+            
+            // First, include any explicit activity entries from the JSON
+            for (const entry of processedData) {
+                if (entry.isActivitySegment || entry.activity_type) {
+                    try {
+                        // Parse ISO dates for proper date objects
+                        const startDate = entry.startTime ? new Date(entry.startTime) : new Date(entry.timestamp);
+                        const endDate = entry.endTime ? new Date(entry.endTime) : new Date(entry.timestamp);
+                        
+                        // Format dates for display
+                        const formattedStartTime = startDate.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                        const formattedEndTime = endDate.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                        
+                        // Calculate duration in minutes
+                        const durationMs = endDate - startDate;
+                        const durationMinutes = (durationMs / 60000).toFixed(2);
+                        
+                        // Calculate distance in kilometers if we have meters
+                        const distanceKm = entry.distance_meters ? 
+                            (parseFloat(entry.distance_meters) / 1000).toFixed(3) : '';
+                        
+                        // Calculate speed if we have both duration and distance
+                        let speedKph = '';
+                        if (distanceKm && durationMinutes > 0) {
+                            const durationHours = durationMinutes / 60;
+                            speedKph = (parseFloat(distanceKm) / durationHours).toFixed(2);
+                        }
+                        
+                        activityData.push({
+                            startTime: formattedStartTime,
+                            endTime: formattedEndTime,
+                            duration_minutes: durationMinutes,
+                            
+                            // Location info
+                            latitude: entry.latitude,
+                            longitude: entry.longitude,
+                            municipality: entry.municipality || '',
+                            
+                            // Activity type from explicit data or derived
+                            activity_type: entry.activity_type || 'UNKNOWN',
+                            activity_probability: entry.activity_confidence || entry.activity_probability || '100',
+                            
+                            // Start location
+                            start_lat: entry.start_lat || entry.latitude,
+                            start_lng: entry.start_lng || entry.longitude,
+                            start_municipality: entry.start_municipality || entry.municipality || '',
+                            
+                            // End location
+                            end_lat: entry.end_lat || entry.latitude,
+                            end_lng: entry.end_lng || entry.longitude,
+                            end_municipality: entry.end_municipality || entry.municipality || '',
+                            
+                            // Distance metrics
+                            distance_meters: entry.distance_meters || '',
+                            distance_km: distanceKm,
+                            speed_kph: speedKph,
+                            
+                            // Additional data
+                            semanticType: entry.semanticType || '',
+                            placeID: entry.placeID || ''
+                        });
+                    } catch (e) {
+                        console.error('Error processing activity entry:', e, entry);
+                    }
+                }
+            }
+            
+            // Then, derive activities from consecutive location entries
+            // Sort data by timestamp for proper sequence
+            const sortedData = [...processedData].sort((a, b) => {
+                const dateA = a.startTime ? new Date(a.startTime) : new Date(a.timestamp);
+                const dateB = b.startTime ? new Date(b.startTime) : new Date(b.timestamp);
+                return dateA - dateB;
+            });
+            
+            // Track the previous entry for calculating transitions
+            let lastEntry = null;
+            
+            for (const entry of sortedData) {
+                if (lastEntry) {
+                    try {
+                        // Calculate time difference between entries
+                        const startDate = lastEntry.startTime ? new Date(lastEntry.startTime) : new Date(lastEntry.timestamp);
+                        const endDate = entry.startTime ? new Date(entry.startTime) : new Date(entry.timestamp);
+                        
+                        // Only calculate transitions if dates are valid
+                        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                            const durationMs = endDate - startDate;
+                            
+                            // Only consider transitions within reasonable time (less than 12 hours)
+                            if (durationMs > 0 && durationMs < 12 * 60 * 60 * 1000) {
+                                const durationMinutes = (durationMs / 60000).toFixed(2);
+                                
+                                // Calculate distance between points
+                                const fromPoint = turf.point([parseFloat(lastEntry.longitude), parseFloat(lastEntry.latitude)]);
+                                const toPoint = turf.point([parseFloat(entry.longitude), parseFloat(entry.latitude)]);
+                                const distanceKm = turf.distance(fromPoint, toPoint, {units: 'kilometers'});
+                                
+                                // Only consider meaningful movements (> 100m)
+                                if (distanceKm > 0.1) {
+                                    // Calculate speed
+                                    const speedKph = (distanceKm / (durationMinutes / 60)).toFixed(2);
+                                    
+                                    // Determine activity type based on speed
+                                    let activityType = 'UNKNOWN';
+                                    if (speedKph < 7) activityType = 'WALKING';
+                                    else if (speedKph < 20) activityType = 'CYCLING';
+                                    else activityType = 'IN_VEHICLE';
+                                    
+                                    // Format timestamps for readability
+                                    const formattedStartTime = startDate.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                                    const formattedEndTime = endDate.toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+                                    
+                                    // Add to activity data
+                                    activityData.push({
+                                        startTime: formattedStartTime,
+                                        endTime: formattedEndTime,
+                                        duration_minutes: durationMinutes,
+                                        
+                                        // Main location (use start point)
+                                        latitude: lastEntry.latitude,
+                                        longitude: lastEntry.longitude,
+                                        municipality: lastEntry.municipality || '',
+                                        
+                                        // Activity classification
+                                        activity_type: activityType,
+                                        activity_probability: '70', // Estimated confidence
+                                        
+                                        // Start location
+                                        start_lat: lastEntry.latitude,
+                                        start_lng: lastEntry.longitude,
+                                        start_municipality: lastEntry.municipality || '',
+                                        start_semanticType: lastEntry.semanticType || '',
+                                        
+                                        // End location
+                                        end_lat: entry.latitude,
+                                        end_lng: entry.longitude,
+                                        end_municipality: entry.municipality || '',
+                                        end_semanticType: entry.semanticType || '',
+                                        
+                                        // Distance metrics
+                                        distance_meters: (distanceKm * 1000).toFixed(0),
+                                        distance_km: distanceKm.toFixed(3),
+                                        speed_kph: speedKph,
+                                        
+                                        // Additional data
+                                        semanticType: lastEntry.semanticType || '',
+                                        placeID: lastEntry.placeID || ''
+                                    });
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error calculating transitions:', e);
+                    }
+                }
+                lastEntry = entry;
+            }
+            
+            // Sort all activities by start time
+            activityData.sort((a, b) => {
+                const dateA = new Date(a.startTime);
+                const dateB = new Date(b.startTime);
+                return dateA - dateB;
+            });
+            
+            console.log(`Extracted ${activityData.length} activities from ${processedData.length} location points`);
+        }
+        
+        /**
+         * Show preview of data in a table format
+         */
+        function showPreview(data, container) {
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div style="padding: 15px; background-color: #fff3e0; border-left: 4px solid #ff9800;">No data available for preview.</div>';
+                return;
+            }
+            
+            // Get all unique keys from the data
+            const keys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
+            
+            // Define fields to show based on the output CSV format
+            const locationHeaders = ['timestamp', 'latitude', 'longitude',
+                                   'country', 'region', 'province', 'municipality', 'semanticType', 'placeID',
+                                   'probability', 'visitProbability'];
+                                    
+            const activityHeaders = ['startTime', 'endTime', 'duration_minutes', 'latitude', 'longitude', 
+                                    'municipality', 'activity_type', 'activity_probability', 'distance_km', 
+                                    'speed_kph', 'start_lat', 'start_lng', 'end_lat', 'end_lng'];
+            
+            let dataToShow = data;
+            
+            // For location history preview, filter out activity entries
+            if (container === previewAll) {
+                dataToShow = data.filter(entry => !entry.isActivitySegment && !entry.start_lat && !entry.end_lat);
+            }
+            
+            // Use the appropriate headers based on which container we're showing
+            const fieldsToShow = container === previewActivities ? 
+                activityHeaders.filter(k => keys.includes(k)) : 
+                locationHeaders.filter(k => keys.includes(k));
+            
+            // Create a scrollable wrapper
+            let html = '<div style="overflow-x: auto; max-width: 100%;">';
+            
+            // Create HTML table
+            html += '<table>';
+            
+            // Table header
+            html += '<tr>';
+            for (const key of fieldsToShow) {
+                html += `<th>${key}</th>`;
+            }
+            html += '</tr>';
+            
+            // Limit to 50 rows for preview
+            const previewLimit = Math.min(50, dataToShow.length);
+            
+            // Table rows
+            for (let i = 0; i < previewLimit; i++) {
+                const item = dataToShow[i];
+                html += '<tr>';
+                for (const key of fieldsToShow) {
+                    html += `<td>${item[key] || ''}</td>`;
+                }
+                html += '</tr>';
+            }
+            
+            html += '</table>';
+            html += '</div>'; // Close scrollable wrapper
+            
+            // Show accurate count of items
+            const totalCount = container === previewAll ? 
+                processedData.filter(entry => !entry.isActivitySegment && !entry.start_lat && !entry.end_lat).length : 
+                activityData.length;
+            
+            html += `<p><em>Showing ${previewLimit} of ${totalCount} entries.</em></p>`;
+            
+            container.innerHTML = html;
+        }
+        
+        /**
+         * Download data as CSV file
+         */
+        function downloadCSV(data, filename) {
+            if (!data || data.length === 0) {
+                status.textContent = 'No data to download.';
+                status.className = 'info-box warning';
+                return;
+            }
+            
+            let csvData;
+            let filteredData;
+            
+            if (filename.includes('activity')) {
+                // For activity data, use the activity-specific format
+                const activityHeaders = 'startTime,endTime,duration_minutes,latitude,longitude,municipality,activity_type,activity_probability,start_lat,start_lng,start_municipality,start_semanticType,end_lat,end_lng,end_municipality,end_semanticType,distance_meters,distance_km,speed_kph,placeID,semanticType';
+                filteredData = data;
+                csvData = formatCSV(filteredData, activityHeaders.split(','));
+                filename = 'location-activity-data.csv';
+            } else {
+                // For location history, use only pure location data columns (no activity-specific fields)
+                // Filter out any entries that are activity segments
+                filteredData = data.filter(entry => !entry.isActivitySegment && !entry.start_lat && !entry.end_lat);
+                
+                // Pure location history headers - add probability and visitProbability
+                const locationHeaders = 'timestamp,latitude,longitude,country,region,province,municipality,placeID,semanticType,probability,visitProbability';
+                csvData = formatCSV(filteredData, locationHeaders.split(','));
+                filename = 'location-history.csv';
+            }
+            
+            // Create download link
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            status.textContent = `Downloaded ${filteredData.length} entries to ${filename}.`;
+            status.className = 'info-box success';
+        }
+        
+        /**
+         * Format data as CSV with specific headers
+         */
+        function formatCSV(data, headers) {
+            // Create CSV header
+            let csv = headers.join(',') + '\n';
+            
+            // Add data rows
+            for (const item of data) {
+                const row = headers.map(header => {
+                    const value = item[header] || '';
+                    
+                    // Quote values with commas
+                    return value.toString().includes(',') ? 
+                        `"${value}"` : value;
+                }).join(',');
+                
+                csv += row + '\n';
+            }
+            
+            return csv;
+        }
+        
+        /**
+         * Toggle a collapsible section
+         */
+        function toggleSection(sectionId, toggleId) {
+            const section = document.getElementById(sectionId);
+            const toggle = document.getElementById(toggleId);
+            
+            section.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
         }
     </script>
 </body>
