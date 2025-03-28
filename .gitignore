@@ -14,6 +14,7 @@ build/
 !tsconfig.json
 !webpack.config.json
 !vercel.json
+!gadm41_ESP_4.json
 
 # Parquet files
 *.parquet
