@@ -483,16 +483,21 @@
                 'startTime', 'endTime', 'duration_minutes',
                 
                 // Location information
-                'latitude', 'longitude', 'municipality',
+                'latitude', 'longitude', 
+                
+                // Administrative hierarchy
+                'country', 'region', 'province', 'municipality',
                 
                 // Activity details
                 'activity_type', 'activity_probability',
                 
                 // Start location
-                'start_lat', 'start_lng', 'start_municipality',
+                'start_lat', 'start_lng', 
+                'start_country', 'start_region', 'start_province', 'start_municipality',
                 
                 // End location
-                'end_lat', 'end_lng', 'end_municipality',
+                'end_lat', 'end_lng',
+                'end_country', 'end_region', 'end_province', 'end_municipality',
                 
                 // Distance information
                 'distance_meters', 'distance_km', 'speed_kph',
@@ -504,15 +509,20 @@
                 'startTime', 'endTime',
                 
                 // Location 
-                'latitude', 'longitude', 'municipality',
+                'latitude', 'longitude',
+                
+                // Administrative hierarchy
+                'country', 'region', 'province', 'municipality',
                 
                 // Visit information
                 'semanticType', 'probability', 'placeID',
                 
                 // Activity data if exists
                 'activity_type', 'activity_probability',
-                'start_lat', 'start_lng', 'start_municipality',
-                'end_lat', 'end_lng', 'end_municipality',
+                'start_lat', 'start_lng', 
+                'start_country', 'start_region', 'start_province', 'start_municipality',
+                'end_lat', 'end_lng',
+                'end_country', 'end_region', 'end_province', 'end_municipality',
                 'distance_meters'
             ];
             
@@ -904,45 +914,128 @@
          * Fallback to load a simplified version embedded in the page
          */
         function loadFallbackGeoJson(statusElement) {
-            statusElement.textContent = 'Loading simplified municipality boundaries...';
+            statusElement.textContent = 'Loading simplified Spanish regions...';
             
-            // This would normally contain the simplified GeoJSON object
-            // For now, we'll use a minimal version to demonstrate
+            // Create a more comprehensive coverage of Spain with autonomous communities and provinces
             const simplifiedGeoJson = {
                 "type": "FeatureCollection",
                 "features": [
-                    // Major cities/regions in Spain - these would be polygons in reality
-                    // but we're using points with a buffer for this example
+                    // Autonomous Communities of Spain with their major coordinates
                     {
                         "type": "Feature",
-                        "properties": { "NAME_4": "Madrid" },
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Madrid", 
+                            "NAME_2": "Madrid",
+                            "NAME_4": "Madrid (Area)" 
+                        },
                         "geometry": { "type": "Point", "coordinates": [-3.7038, 40.4168] }
                     },
                     {
                         "type": "Feature",
-                        "properties": { "NAME_4": "Barcelona" },
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Cataluña", 
+                            "NAME_2": "Barcelona",
+                            "NAME_4": "Barcelona (Area)" 
+                        },
                         "geometry": { "type": "Point", "coordinates": [2.1734, 41.3851] }
                     },
                     {
                         "type": "Feature",
-                        "properties": { "NAME_4": "Valencia" },
-                        "geometry": { "type": "Point", "coordinates": [-0.3763, 39.4699] }
-                    },
-                    {
-                        "type": "Feature",
-                        "properties": { "NAME_4": "Sevilla" },
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Andalucía", 
+                            "NAME_2": "Sevilla",
+                            "NAME_4": "Sevilla (Area)" 
+                        },
                         "geometry": { "type": "Point", "coordinates": [-5.9845, 37.3891] }
                     },
                     {
                         "type": "Feature",
-                        "properties": { "NAME_4": "Zaragoza" },
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Andalucía", 
+                            "NAME_2": "Málaga",
+                            "NAME_4": "Málaga (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-4.4214, 36.7213] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Andalucía", 
+                            "NAME_2": "Granada",
+                            "NAME_4": "Granada (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-3.5986, 37.1773] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Andalucía", 
+                            "NAME_2": "Córdoba",
+                            "NAME_4": "Córdoba (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-4.7794, 37.8882] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Andalucía", 
+                            "NAME_2": "Cádiz",
+                            "NAME_4": "Cádiz (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-6.3010, 36.5298] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Comunidad Valenciana", 
+                            "NAME_2": "Valencia",
+                            "NAME_4": "Valencia (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-0.3763, 39.4699] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "Aragón", 
+                            "NAME_2": "Zaragoza",
+                            "NAME_4": "Zaragoza (Area)" 
+                        },
                         "geometry": { "type": "Point", "coordinates": [-0.8890, 41.6488] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain", 
+                            "NAME_1": "Galicia",
+                            "NAME_2": "A Coruña",
+                            "NAME_4": "A Coruña (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-8.3959, 43.3623] }
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": { 
+                            "NAME_0": "Spain",
+                            "NAME_1": "País Vasco", 
+                            "NAME_2": "Vizcaya",
+                            "NAME_4": "Bilbao (Area)" 
+                        },
+                        "geometry": { "type": "Point", "coordinates": [-2.9350, 43.2630] }
                     }
                 ]
             };
             
             municipalityPolygons = simplifiedGeoJson;
-            statusElement.textContent = `✓ Loaded simplified municipality data (${simplifiedGeoJson.features.length} major cities).`;
+            statusElement.textContent = `✓ Loaded simplified Spanish regions (${simplifiedGeoJson.features.length} areas).`;
             statusElement.style.color = '#FF9800';
             
             // Enrich any already processed data
@@ -953,7 +1046,7 @@
         }
         
         /**
-         * Enrich location data with municipality names
+         * Enrich location data with all location hierarchy levels
          */
         function enrichWithMunicipalities(data) {
             if (!municipalityPolygons) {
@@ -966,28 +1059,51 @@
             const enriched = data.map(entry => {
                 // For regular entries, use main lat/long
                 if (entry.latitude !== undefined && entry.longitude !== undefined) {
-                    entry.municipality = findMunicipality(entry.latitude, entry.longitude);
-                    if (entry.municipality) enrichedCount++;
+                    const locationData = findMunicipality(entry.latitude, entry.longitude);
+                    if (locationData) {
+                        // Add all location hierarchy levels
+                        entry.country = locationData.country;
+                        entry.region = locationData.region;
+                        entry.province = locationData.province;
+                        entry.municipality = locationData.municipality;
+                        enrichedCount++;
+                    }
                 }
                 // For activity entries, use start coordinates if main not available
                 else if (entry.start_lat !== undefined && entry.start_lng !== undefined) {
-                    entry.start_municipality = findMunicipality(entry.start_lat, entry.start_lng);
-                    if (entry.start_municipality) enrichedCount++;
-                    
-                    // Also add main municipality using start point for better CSV output
-                    entry.municipality = entry.start_municipality;
+                    const startLocationData = findMunicipality(entry.start_lat, entry.start_lng);
+                    if (startLocationData) {
+                        // Add location data for start point
+                        entry.start_country = startLocationData.country;
+                        entry.start_region = startLocationData.region;
+                        entry.start_province = startLocationData.province;
+                        entry.start_municipality = startLocationData.municipality;
+                        
+                        // Also add main location data for better CSV output
+                        entry.country = startLocationData.country;
+                        entry.region = startLocationData.region;
+                        entry.province = startLocationData.province;
+                        entry.municipality = startLocationData.municipality;
+                        enrichedCount++;
+                    }
                 }
                 
-                // Add end municipality for activities if coordinates exist
+                // Add end location data for activities if coordinates exist
                 if (entry.end_lat !== undefined && entry.end_lng !== undefined) {
-                    entry.end_municipality = findMunicipality(entry.end_lat, entry.end_lng);
-                    if (entry.end_municipality) enrichedCount++;
+                    const endLocationData = findMunicipality(entry.end_lat, entry.end_lng);
+                    if (endLocationData) {
+                        entry.end_country = endLocationData.country;
+                        entry.end_region = endLocationData.region;
+                        entry.end_province = endLocationData.province;
+                        entry.end_municipality = endLocationData.municipality;
+                        enrichedCount++;
+                    }
                 }
                 
                 return entry;
             });
             
-            console.log(`Enriched ${enrichedCount} location points with municipality data out of ${data.length} total entries`);
+            console.log(`Enriched ${enrichedCount} location points with location data out of ${data.length} total entries`);
             return enriched;
         }
         
@@ -1001,24 +1117,51 @@
             
             const point = turf.point([lng, lat]);
             
+            // First attempt to find precise polygon match
+            let result = null;
+            let matchDistance = Infinity;
+            
             for (const feature of municipalityPolygons.features) {
                 // For polygon geometries (the normal case)
                 if (feature.geometry && feature.geometry.type.includes('Polygon') && 
                     turf.booleanPointInPolygon(point, feature.geometry)) {
-                    return feature.properties[municipalityNameField] || 'Unknown';
+                    // Return an object with all admin levels
+                    return {
+                        country: feature.properties.NAME_0 || 'Spain',
+                        region: feature.properties.NAME_1,
+                        province: feature.properties.NAME_2,
+                        municipality: feature.properties.NAME_4
+                    };
                 }
                 
                 // For the simplified version with points
                 if (feature.geometry && feature.geometry.type === 'Point') {
-                    // Create a 10km buffer around the point
-                    const buffer = turf.buffer(feature.geometry, 10, {units: 'kilometers'});
+                    // Create a larger buffer (50km) around the point to cover more area
+                    const buffer = turf.buffer(feature.geometry, 50, {units: 'kilometers'});
+                    
                     if (turf.booleanPointInPolygon(point, buffer)) {
-                        return feature.properties[municipalityNameField] || 'Unknown';
+                        // If we're within the buffer, calculate distance to center
+                        const distance = turf.distance(
+                            point, 
+                            turf.point(feature.geometry.coordinates), 
+                            {units: 'kilometers'}
+                        );
+                        
+                        // Keep track of the closest match
+                        if (distance < matchDistance) {
+                            matchDistance = distance;
+                            result = {
+                                country: feature.properties.NAME_0 || 'Spain',
+                                region: feature.properties.NAME_1,
+                                province: feature.properties.NAME_2,
+                                municipality: feature.properties.NAME_4
+                            };
+                        }
                     }
                 }
             }
             
-            return null;
+            return result;
         }
     </script>
 </body>
